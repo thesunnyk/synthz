@@ -1,0 +1,6 @@
+[package]
+name = "synthz"
+version = "0.1.0"
+authors = ["kalsi <thesunnyk@gmail.com>"]
+
+[dependencies]
