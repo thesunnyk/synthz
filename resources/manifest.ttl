@@ -1,0 +1,14 @@
+@prefix lv2:  <http://lv2plug.in/ns/lv2core#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<https://quaddmg.com/plugins/eg-amp> a lv2:Plugin .
+
+<https://quaddmg.com/plugins/eg-amp> lv2:binary <amp.so> .
+
+<https://quaddmg.com/plugins/eg-amp> rdfs:seeAlso <amp.ttl> .
+
+<http://lv2plug.in/plugins/eg-amp>
+	a lv2:Plugin ;
+	lv2:binary <amp.so>  ;
+	rdfs:seeAlso <amp.ttl> .
+
