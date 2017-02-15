@@ -7,7 +7,7 @@
 
 <https://quaddmg.com/plugins/eg-amp> rdfs:seeAlso <amp.ttl> .
 
-<http://lv2plug.in/plugins/eg-amp>
+<http://quaddmg.com/plugins/eg-amp>
 	a lv2:Plugin ;
 	lv2:binary <amp.so>  ;
 	rdfs:seeAlso <amp.ttl> .
