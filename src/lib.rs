@@ -81,11 +81,27 @@ extern fn deactivate(instance: LV2_Handle) {
 }
 
 extern fn run(instance: LV2_Handle, n_samples: u32) {
+    let mut amp: *mut Amp = instance as *mut Amp;
+    unsafe {
+        let gain: f32 = *(*amp).gain;
+        let input: &[f32] = std::slice::from_raw_parts((*amp).input, n_samples as usize);
+        let output: &mut [f32] = std::slice::from_raw_parts_mut((*amp).output, n_samples as usize);
+
+        do_gain(gain, input, output);
+    }
+}
+
+fn do_gain(gain: f32, input: &[f32], output: &mut [f32]) {
+    let coef = if gain > (-90.0) { (10.0 as f32).powf(gain * 0.05) } else { 0.0 };
+
+    for pos in 0..input.len() {
+        output[pos as usize] = input[pos as usize] * coef;
+    }
 }
 
 extern fn cleanup(instance: LV2_Handle) {
     unsafe {
-        let mut amp = Box::from_raw(instance);
+        let mut amp: Box<Amp> = Box::from_raw(instance as *mut Amp);
     }
 }
 
