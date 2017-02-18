@@ -3,9 +3,9 @@ use std::ptr;
 use std::ffi as ffi;
 use std::os::raw as raw;
 
-const AmpGain: u32 = 1;
-const AmpInput: u32 = 2;
-const AmpOutput: u32 = 3;
+const AmpGain: u32 = 0;
+const AmpInput: u32 = 1;
+const AmpOutput: u32 = 2;
 
 #[repr(C)]
 struct Amp {
@@ -17,7 +17,7 @@ struct Amp {
 type LV2_Handle = *mut raw::c_void;
 
 #[repr(C)]
-struct LV2_Descriptor {
+pub struct LV2_Descriptor {
     URI: *const raw::c_char,
     instantiate: extern fn (*const LV2_Descriptor, f64, *const raw::c_char, *const *const LV2_Feature) -> LV2_Handle,
     connect_port: extern fn (LV2_Handle, u32, *mut raw::c_void),
@@ -34,7 +34,7 @@ struct LV2_Feature {
     data: *mut raw::c_void
 }
 
-const AMP_URI: *const u8 = b"http://quaddmg.com/plugins/eg-amp\0" as *const u8;
+const AMP_URI: *const u8 = b"http://quaddmg.com/plugins/synthz\0" as *const u8;
 
 const Lv2Descriptor: LV2_Descriptor = LV2_Descriptor {
     URI: AMP_URI as *const raw::c_char,
@@ -52,7 +52,7 @@ extern fn instantiate(descriptor: *const LV2_Descriptor,
                       rate: f64,
                       path: *const raw::c_char,
                       features: *const *const LV2_Feature) -> LV2_Handle {
-    println!("OMG OMG ");
+    println!("SynthZ instantiate");
     let mut amp = Box::new(Amp {
         gain: std::ptr::null_mut(),
         input: std::ptr::null_mut(),
@@ -66,10 +66,16 @@ extern fn connect_port(instance: LV2_Handle, port: u32, data: *mut raw::c_void) 
 
     unsafe {
         match port {
-            AmpGain => (*amp).gain = data as *const f32,
-            AmpInput => (*amp).input = data as *const f32,
-            AmpOutput => (*amp).output = data as *mut f32,
-            _ => {}
+            AmpGain => {
+                (*amp).gain = data as *const f32
+            },
+            AmpInput => {
+                (*amp).input = data as *const f32
+            },
+            AmpOutput => {
+                (*amp).output = data as *mut f32
+            },
+            _ => {println!("SynthZ Connect to unknown port")}
         }
     }
 }
@@ -100,17 +106,20 @@ fn do_gain(gain: f32, input: &[f32], output: &mut [f32]) {
 }
 
 extern fn cleanup(instance: LV2_Handle) {
+    println!("SynthZ cleanup");
     unsafe {
         let mut amp: Box<Amp> = Box::from_raw(instance as *mut Amp);
     }
 }
 
 extern fn extension_data(uri: *const raw::c_char) -> *mut raw::c_void {
+    println!("SynthZ extension_data");
     return std::ptr::null_mut();
 }
 
 #[no_mangle]
-extern fn lv2_descriptor(index: u32) -> *const LV2_Descriptor {
+pub extern fn lv2_descriptor(index: u32) -> *const LV2_Descriptor {
+    println!("SynthZ lv2_descriptor");
     match index {
         0 => return &Lv2Descriptor,
         _ => return std::ptr::null_mut()
