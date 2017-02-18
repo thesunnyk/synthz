@@ -4,3 +4,7 @@ version = "0.1.0"
 authors = ["kalsi <thesunnyk@gmail.com>"]
 
 [dependencies]
+
+[lib]
+name = "synthz"
+crate-type = ["dylib"]

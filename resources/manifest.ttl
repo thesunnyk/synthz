@@ -3,12 +3,12 @@
 
 <https://quaddmg.com/plugins/synthz> a lv2:Plugin .
 
-<https://quaddmg.com/plugins/synthz> lv2:binary <amp.so> .
+<https://quaddmg.com/plugins/synthz> lv2:binary <libsynthz.so> .
 
-<https://quaddmg.com/plugins/synthz> rdfs:seeAlso <amp.ttl> .
+<https://quaddmg.com/plugins/synthz> rdfs:seeAlso <synthz.ttl> .
 
 <http://quaddmg.com/plugins/synthz>
 	a lv2:Plugin ;
-	lv2:binary <amp.so>  ;
-	rdfs:seeAlso <amp.ttl> .
+	lv2:binary <libsynthz.so>  ;
+	rdfs:seeAlso <synthz.ttl> .
 

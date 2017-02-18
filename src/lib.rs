@@ -109,6 +109,7 @@ extern fn extension_data(uri: *const raw::c_char) -> *mut raw::c_void {
     return std::ptr::null_mut();
 }
 
+#[no_mangle]
 extern fn lv2_descriptor(index: u32) -> *const LV2_Descriptor {
     match index {
         0 => return &Lv2Descriptor,
