@@ -15,6 +15,36 @@ use std::os::raw as raw;
 const ControlInput: u32 = 0;
 const SynthOutput: u32 = 1;
 
+pub struct SamplerUris {
+    pub atom_Blank: LV2_URID,
+    pub atom_Path: LV2_URID,
+    pub atom_Resource: LV2_URID,
+    pub atom_Sequence: LV2_URID,
+    pub atom_URID: LV2_URID,
+    pub atom_eventTransfer: LV2_URID,
+    pub midi_Event: LV2_URID,
+    pub patch_Set: LV2_URID,
+    pub patch_property: LV2_URID,
+    pub patch_value: LV2_URID,
+}
+
+pub fn map_sampler_uris(map: *const LV2_URID_Map) -> SamplerUris {
+    SamplerUris {
+        atom_Blank: urid_for_const(map, LV2_ATOM_Blank),
+        atom_Path: urid_for_const(map, LV2_ATOM_Path),
+        atom_Resource: urid_for_const(map, LV2_ATOM_Resource),
+        atom_Sequence: urid_for_const(map, LV2_ATOM_Sequence),
+        atom_URID: urid_for_const(map, LV2_ATOM_URID),
+        atom_eventTransfer: urid_for_const(map, LV2_ATOM_eventTransfer),
+
+        midi_Event: urid_for_const(map, LV2_MIDI_MidiEvent),
+
+        patch_Set: urid_for_const(map, LV2_PATCH_Set),
+        patch_property: urid_for_const(map, LV2_PATCH_property),
+        patch_value: urid_for_const(map, LV2_PATCH_value),
+    }
+}
+
 fn extract_sequence(seq: *const LV2_Atom_Sequence, urid_map: *const SamplerUris) {
 
     let iter: AtomSequenceIter = AtomSequenceIter::new(seq);
