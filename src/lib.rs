@@ -46,13 +46,15 @@ pub fn map_sampler_uris(map: *const LV2_URID_Map) -> SamplerUris {
     }
 }
 
-fn extract_sequence(seq: *const LV2_Atom_Sequence, urid_map: *const SamplerUris) {
+fn extract_sequence(seq: *const LV2_Atom_Sequence, urid_map: &SamplerUris) {
 
     let iter: AtomSequenceIter = AtomSequenceIter::new(seq);
 
     for data in iter {
-        // if (*next).body.atom_type == (*urid_map).midi_Event {
-        println!("{:?} -> {:?}", data.data_type, data.data);
+        if data.data_type == urid_map.midi_Event {
+            // TODO Extract MIDI Data
+            println!("{:?} -> {:?} ({:?})", data.data_type, data.data, data.size);
+        }
     }
 }
 
