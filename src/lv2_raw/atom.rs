@@ -1,5 +1,5 @@
 
-use lv2_urid::*;
+use lv2_raw::urid::LV2_URID as LV2_URID;
 
 use std::mem;
 

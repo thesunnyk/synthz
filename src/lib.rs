@@ -1,11 +1,9 @@
 
-mod lv2_core;
-mod lv2_urid;
-mod lv2_atom;
+mod lv2_raw;
 
-use lv2_core::*;
-use lv2_urid::*;
-use lv2_atom::*;
+use lv2_raw::core::*;
+use lv2_raw::urid::*;
+use lv2_raw::atom::*;
 use std::ptr;
 use std::mem;
 use std::ffi as ffi;
