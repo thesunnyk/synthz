@@ -7,6 +7,7 @@ use lv2_raw::urid::*;
 use lv2_raw::atom::*;
 use lv2::atom::*;
 use lv2::urid::*;
+use lv2::core::*;
 use std::ptr;
 use std::mem;
 use std::ffi as ffi;
@@ -80,20 +81,19 @@ fn extract_features(features: *const *const LV2_Feature) -> Option<*const LV2_UR
 
     let mut urid_map: Option<*const LV2_URID_Map> = None;
 
+    let iter = LV2_Feature_Iter::new(features);
+
     unsafe {
         let urid_map_uri = ffi::CStr::from_ptr(LV2_URID_map as *const raw::c_char);
 
-        while *features_iter as usize > 0 {
-            let mut feature: *const LV2_Feature = *features_iter;
-
+        for feature in iter {
             let urid = ffi::CStr::from_ptr((*feature).URI);
             if urid_map_uri == urid {
                 urid_map = Some((*feature).data as *const LV2_URID_Map);
             }
-
-            features_iter = features_iter.offset(1);
         }
     }
+
     urid_map
 }
 
