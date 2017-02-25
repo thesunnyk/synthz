@@ -1,4 +1,11 @@
 
+mod lv2_core;
+mod lv2_urid;
+mod lv2_atom;
+
+use lv2_core::*;
+use lv2_urid::*;
+use lv2_atom::*;
 use std::ptr;
 use std::mem;
 use std::ffi as ffi;
@@ -7,109 +14,14 @@ use std::os::raw as raw;
 const ControlInput: u32 = 0;
 const SynthOutput: u32 = 1;
 
-type LV2_Handle = *mut raw::c_void;
-type LV2_URID_Map_Handle = *mut raw::c_void;
-
-type LV2_URID = u32;
-
-#[repr(C)]
-pub struct LV2_Descriptor {
-    URI: *const raw::c_char,
-    instantiate: extern fn (*const LV2_Descriptor, f64, *const raw::c_char, *const *const LV2_Feature) -> LV2_Handle,
-    connect_port: extern fn (LV2_Handle, u32, *mut raw::c_void),
-    activate: extern fn (LV2_Handle),
-    run:extern fn (LV2_Handle, u32),
-    deactivate:extern fn (LV2_Handle),
-    cleanup:extern fn (LV2_Handle),
-    extension_data:extern fn (*const raw::c_char) -> *mut raw::c_void,
-}
-
-const LV2_URID_map: *const u8 = b"http://lv2plug.in/ns/ext/urid#map\0" as *const u8;
-
-const LV2_ATOM_Blank: *const u8 = b"http://lv2plug.in/ns/ext/atom#Blank\0" as *const u8;
-const LV2_ATOM_Path: *const u8 = b"http://lv2plug.in/ns/ext/atom#Path\0" as *const u8;
-const LV2_ATOM_Resource: *const u8 = b"http://lv2plug.in/ns/ext/atom#Resource\0" as *const u8;
-const LV2_ATOM_Sequence: *const u8 = b"http://lv2plug.in/ns/ext/atom#Sequence\0" as *const u8;
-const LV2_ATOM_URID: *const u8 = b"http://lv2plug.in/ns/ext/atom#URID\0" as *const u8;
-const LV2_ATOM_eventTransfer: *const u8 = b"http://lv2plug.in/ns/ext/atom#eventTransfer\0" as *const u8;
-
-const LV2_MIDI_MidiEvent: *const u8 = b"http://lv2plug.in/ns/ext/midi#MidiEvent\0" as *const u8;
-
-const LV2_PATCH_Set: *const u8 = b"http://lv2plug.in/ns/ext/patch#Set\0" as *const u8;
-const LV2_PATCH_property: *const u8 = b"http://lv2plug.in/ns/ext/patch#property\0" as *const u8;
-const LV2_PATCH_value: *const u8 = b"http://lv2plug.in/ns/ext/patch#value\0" as *const u8;
-
-#[repr(C)]
-pub struct LV2_Atom {
-    size: u32,
-    atom_type: u32,
-}
-
-// #[repr(C)]
-// pub union LV2_Atom_Event_Time {
-//     frames: i64,
-//     beats: f64,
-// }
-
-#[repr(C)]
-pub struct LV2_Atom_Event {
-    time_frames: i64, // LV2_Atom_Event_Time,
-    body: LV2_Atom,
-}
-
-#[repr(C)]
-pub struct LV2_Atom_Sequence_Body {
-    unit: u32,
-    pad: u32,
-}
-
-#[repr(C)]
-pub struct LV2_Atom_Sequence {
-    atom: LV2_Atom,
-    body: LV2_Atom_Sequence_Body,
-}
-
-fn pad_size(size: u32) -> usize {
-    let seven: usize = 7;
-
-    (size as usize + seven) & !seven
-}
-
 fn extract_sequence(seq: *const LV2_Atom_Sequence, urid_map: *const SamplerUris) {
-    unsafe {
-        let start = seq.offset(1) as *const LV2_Atom_Event;
 
-        let mut next = start;
+    let iter: AtomSequenceIter = AtomSequenceIter::new(seq);
 
-        let total: usize = (seq as usize)
-            .checked_add((*seq).atom.size as usize)
-            .unwrap()
-            .checked_add(mem::size_of::<LV2_Atom>())
-            .unwrap();
-
-        while (next as usize) < total {
-            let next_size: usize = mem::size_of::<LV2_Atom_Event>() + pad_size((*next).body.size);
-
-            // TODO Grab events
-            if (*next).body.atom_type == (*urid_map).midi_Event {
-                let msg = next.offset(1) as *const u8;
-                println!("{:?}", *msg);
-            }
-
-            next = ((next as usize).checked_add(next_size as usize).unwrap()) as *const LV2_Atom_Event;
-        }
+    for data in iter {
+        // if (*next).body.atom_type == (*urid_map).midi_Event {
+        println!("{:?} -> {:?}", data.data_type, data.data);
     }
-}
-
-#[repr(C)]
-struct LV2_Feature {
-    URI: *const raw::c_char,
-    data: *mut raw::c_void
-}
-
-struct LV2_URID_Map {
-    handle: LV2_URID_Map_Handle,
-    map: extern fn(LV2_URID_Map_Handle, *const raw::c_char) -> LV2_URID,
 }
 
 struct SamplerUris {
@@ -164,17 +76,12 @@ const Lv2Descriptor: LV2_Descriptor = LV2_Descriptor {
     extension_data: extension_data
 };
 
-extern fn instantiate(descriptor: *const LV2_Descriptor,
-                      rate: f64,
-                      path: *const raw::c_char,
-                      features: *const *const LV2_Feature) -> LV2_Handle {
-    println!("SynthZ instantiate");
+fn extract_features(features: *const *const LV2_Feature) -> Option<*const LV2_URID_Map> {
+    let mut features_iter: *const *const LV2_Feature = features;
+
+    let mut urid_map: Option<*const LV2_URID_Map> = None;
 
     unsafe {
-        let mut features_iter: *const *const LV2_Feature = features;
-
-        let mut urid_map: Option<*const LV2_URID_Map> = None;
-
         let urid_map_uri = ffi::CStr::from_ptr(LV2_URID_map as *const raw::c_char);
 
         while *features_iter as usize > 0 {
@@ -187,14 +94,24 @@ extern fn instantiate(descriptor: *const LV2_Descriptor,
 
             features_iter = features_iter.offset(1);
         }
-
-        let mut amp = Box::new(Amp {
-            input: std::ptr::null_mut(),
-            output: std::ptr::null_mut(),
-            samplerUris: map_sampler_uris(urid_map.unwrap())
-        });
-        Box::into_raw(amp) as LV2_Handle
     }
+    urid_map
+}
+
+extern fn instantiate(descriptor: *const LV2_Descriptor,
+                      rate: f64,
+                      path: *const raw::c_char,
+                      features: *const *const LV2_Feature) -> LV2_Handle {
+    println!("SynthZ instantiate");
+
+    let mut urid_map = extract_features(features);
+
+    let mut amp = Box::new(Amp {
+        input: std::ptr::null_mut(),
+        output: std::ptr::null_mut(),
+        samplerUris: map_sampler_uris(urid_map.unwrap())
+    });
+    Box::into_raw(amp) as LV2_Handle
 }
 
 extern fn connect_port(instance: LV2_Handle, port: u32, data: *mut raw::c_void) {
