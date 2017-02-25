@@ -1,4 +1,6 @@
 
+pub const LV2_MIDI_MidiEvent: *const u8 = b"http://lv2plug.in/ns/ext/midi#MidiEvent\0" as *const u8;
+
 type LV2_Midi_Message_Type = u8;
 
 const LV2_MIDI_MSG_INVALID: LV2_Midi_Message_Type          = 0;     // Invalid Message

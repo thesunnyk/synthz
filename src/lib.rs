@@ -5,9 +5,11 @@ mod lv2;
 use lv2_raw::core::*;
 use lv2_raw::urid::*;
 use lv2_raw::atom::*;
+use lv2_raw::midi::*;
 use lv2::atom::*;
 use lv2::urid::*;
 use lv2::core::*;
+use lv2::midi::*;
 use std::ptr;
 use std::mem;
 use std::ffi;
@@ -46,15 +48,14 @@ pub fn map_sampler_uris(map: *const LV2_URID_Map) -> SamplerUris {
     }
 }
 
-fn extract_sequence(seq: *const LV2_Atom_Sequence, urid_map: &SamplerUris) {
+fn do_extract_seq(seq: *const LV2_Atom_Sequence, urid_map: &SamplerUris) {
 
-    let iter: AtomSequenceIter = AtomSequenceIter::new(seq);
+    let mut m = MidiEventExtractor::new(urid_map.midi_Event);
 
-    for data in iter {
-        if data.data_type == urid_map.midi_Event {
-            // TODO Extract MIDI Data
-            println!("{:?} -> {:?} ({:?})", data.data_type, data.data, data.size);
-        }
+    extract_sequence(seq, vec!(&mut m));
+
+    for data in m.midi_data {
+        println!("{} -> {:x} {:x} {:x}", data.time_frames, data.status, data.pitch, data.velocity);
     }
 }
 
@@ -62,7 +63,7 @@ fn extract_sequence(seq: *const LV2_Atom_Sequence, urid_map: &SamplerUris) {
 struct Amp {
     input: *const LV2_Atom_Sequence,
     output: *mut f32,
-    samplerUris: SamplerUris
+    samplerUris: SamplerUris,
 }
 
 const AMP_URI: *const u8 = b"http://quaddmg.com/plugins/synthz\0" as *const u8;
@@ -152,7 +153,7 @@ extern fn run(instance: LV2_Handle, n_samples: u32) {
     unsafe {
         let input = (*amp).input;
 
-        extract_sequence(input, &(*amp).samplerUris);
+        do_extract_seq(input, &(*amp).samplerUris);
 
         let output: &mut [f32] = std::slice::from_raw_parts_mut((*amp).output, n_samples as usize);
 

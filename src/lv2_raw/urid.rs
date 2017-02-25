@@ -7,8 +7,7 @@ pub type LV2_URID = u32;
 
 pub const LV2_URID_map: *const u8 = b"http://lv2plug.in/ns/ext/urid#map\0" as *const u8;
 
-// TODO Move to lv2_midi.rs and lv2_patch.rs
-pub const LV2_MIDI_MidiEvent: *const u8 = b"http://lv2plug.in/ns/ext/midi#MidiEvent\0" as *const u8;
+// TODO Move to lv2_raw::patch.rs
 
 pub const LV2_PATCH_Set: *const u8 = b"http://lv2plug.in/ns/ext/patch#Set\0" as *const u8;
 pub const LV2_PATCH_property: *const u8 = b"http://lv2plug.in/ns/ext/patch#property\0" as *const u8;
