@@ -1,9 +1,12 @@
 
 mod lv2_raw;
+mod lv2;
 
 use lv2_raw::core::*;
 use lv2_raw::urid::*;
 use lv2_raw::atom::*;
+use lv2::atom::*;
+use lv2::urid::*;
 use std::ptr;
 use std::mem;
 use std::ffi as ffi;
@@ -19,38 +22,6 @@ fn extract_sequence(seq: *const LV2_Atom_Sequence, urid_map: *const SamplerUris)
     for data in iter {
         // if (*next).body.atom_type == (*urid_map).midi_Event {
         println!("{:?} -> {:?}", data.data_type, data.data);
-    }
-}
-
-struct SamplerUris {
-    atom_Blank: LV2_URID,
-    atom_Path: LV2_URID,
-    atom_Resource: LV2_URID,
-    atom_Sequence: LV2_URID,
-    atom_URID: LV2_URID,
-    atom_eventTransfer: LV2_URID,
-    midi_Event: LV2_URID,
-    patch_Set: LV2_URID,
-    patch_property: LV2_URID,
-    patch_value: LV2_URID,
-}
-
-fn map_sampler_uris(map: *const LV2_URID_Map) -> SamplerUris {
-    unsafe {
-        SamplerUris {
-            atom_Blank: ((*map).map)((*map).handle, LV2_ATOM_Blank as *const raw::c_char),
-            atom_Path: ((*map).map)((*map).handle, LV2_ATOM_Path as *const raw::c_char),
-            atom_Resource: ((*map).map)((*map).handle, LV2_ATOM_Resource as *const raw::c_char),
-            atom_Sequence: ((*map).map)((*map).handle, LV2_ATOM_Sequence as *const raw::c_char),
-            atom_URID: ((*map).map)((*map).handle, LV2_ATOM_URID as *const raw::c_char),
-            atom_eventTransfer: ((*map).map)((*map).handle, LV2_ATOM_eventTransfer as *const raw::c_char),
-
-            midi_Event: ((*map).map)((*map).handle, LV2_MIDI_MidiEvent as *const raw::c_char),
-
-            patch_Set: ((*map).map)((*map).handle, LV2_PATCH_Set as *const raw::c_char),
-            patch_property: ((*map).map)((*map).handle, LV2_PATCH_property as *const raw::c_char),
-            patch_value: ((*map).map)((*map).handle, LV2_PATCH_value as *const raw::c_char),
-        }
     }
 }
 
