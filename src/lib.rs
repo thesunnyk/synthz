@@ -10,8 +10,8 @@ use lv2::urid::*;
 use lv2::core::*;
 use std::ptr;
 use std::mem;
-use std::ffi as ffi;
-use std::os::raw as raw;
+use std::ffi;
+use std::os::raw;
 
 const ControlInput: u32 = 0;
 const SynthOutput: u32 = 1;
@@ -78,25 +78,32 @@ const Lv2Descriptor: LV2_Descriptor = LV2_Descriptor {
     extension_data: extension_data
 };
 
-fn extract_features(features: *const *const LV2_Feature) -> Option<*const LV2_URID_Map> {
-    let mut features_iter: *const *const LV2_Feature = features;
+struct URID_Extractor<'a> {
+    urid_uri: &'a ffi::CStr,
+    urid_map: Option<*const LV2_URID_Map>
+}
 
-    let mut urid_map: Option<*const LV2_URID_Map> = None;
-
-    let iter = LV2_Feature_Iter::new(features);
-
-    unsafe {
-        let urid_map_uri = ffi::CStr::from_ptr(LV2_URID_map as *const raw::c_char);
-
-        for feature in iter {
-            let urid = ffi::CStr::from_ptr((*feature).URI);
-            if urid_map_uri == urid {
-                urid_map = Some((*feature).data as *const LV2_URID_Map);
+impl <'a> URID_Extractor<'a> {
+    fn new() -> URID_Extractor<'a> {
+        unsafe {
+            URID_Extractor {
+                urid_uri: ffi::CStr::from_ptr(LV2_URID_map as *const raw::c_char),
+                urid_map: None
             }
         }
     }
+}
 
-    urid_map
+impl <'a> FeatureExtractor for URID_Extractor<'a> {
+    fn matches(&self, item: &ffi::CStr) -> bool {
+        *item == *self.urid_uri
+    }
+
+    fn store(&mut self, data: *const raw::c_void) {
+        unsafe {
+            self.urid_map = Some(data as *const LV2_URID_Map);
+        }
+    }
 }
 
 extern fn instantiate(descriptor: *const LV2_Descriptor,
@@ -105,12 +112,15 @@ extern fn instantiate(descriptor: *const LV2_Descriptor,
                       features: *const *const LV2_Feature) -> LV2_Handle {
     println!("SynthZ instantiate");
 
-    let mut urid_map = extract_features(features);
+    let mut urid_extractor = URID_Extractor::new();
+    extract_features(features, vec!(&mut urid_extractor));
+
+    let mut urid_map = urid_extractor.urid_map.unwrap();
 
     let mut amp = Box::new(Amp {
         input: std::ptr::null_mut(),
         output: std::ptr::null_mut(),
-        samplerUris: map_sampler_uris(urid_map.unwrap())
+        samplerUris: map_sampler_uris(urid_map)
     });
     Box::into_raw(amp) as LV2_Handle
 }

@@ -1,4 +1,6 @@
 
+use std::ffi;
+use std::os::raw;
 use lv2_raw::core;
 
 pub struct LV2_Feature_Iter {
@@ -28,5 +30,26 @@ impl Iterator for LV2_Feature_Iter {
         }
     }
 
+}
+
+pub trait FeatureExtractor {
+    fn matches(&self, item: &ffi::CStr) -> bool;
+    fn store(&mut self, data: *const raw::c_void);
+}
+
+pub fn extract_features(features: *const *const core::LV2_Feature, mut extractors: Vec<&mut FeatureExtractor>) {
+
+    let iter = LV2_Feature_Iter::new(features);
+
+    unsafe {
+        for feature in iter {
+            let urid = ffi::CStr::from_ptr((*feature).URI);
+            for extractor in &mut extractors {
+                if extractor.matches(urid) {
+                    extractor.store((*feature).data);
+                }
+            }
+        }
+    }
 }
 

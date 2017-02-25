@@ -116,3 +116,14 @@ pub fn midi_is_system_message(msg: *const u8) -> bool {
     }
 }
 
+pub fn midi_message_type(msg: *const u8) -> LV2_Midi_Message_Type {
+    unsafe {
+        if midi_is_voice_message(msg) {
+            (*msg & 0xF0) as LV2_Midi_Message_Type
+        } else if midi_is_system_message(msg) {
+            *msg as LV2_Midi_Message_Type
+        } else {
+            LV2_MIDI_MSG_INVALID
+        }
+    }
+}
