@@ -2,6 +2,12 @@
 mod lv2_raw;
 mod lv2;
 
+use std::ptr;
+use std::mem;
+use std::ffi;
+use std::os::raw;
+use std::collections::BTreeMap;
+
 use lv2_raw::core::*;
 use lv2_raw::urid::*;
 use lv2_raw::atom::*;
@@ -10,10 +16,6 @@ use lv2::atom::*;
 use lv2::urid::*;
 use lv2::core::*;
 use lv2::midi::*;
-use std::ptr;
-use std::mem;
-use std::ffi;
-use std::os::raw;
 
 const ControlInput: u32 = 0;
 const SynthOutput: u32 = 1;
@@ -45,17 +47,6 @@ pub fn map_sampler_uris(map: *const LV2_URID_Map) -> SamplerUris {
         patch_Set: urid_for_const(map, LV2_PATCH_Set),
         patch_property: urid_for_const(map, LV2_PATCH_property),
         patch_value: urid_for_const(map, LV2_PATCH_value),
-    }
-}
-
-fn do_extract_seq(seq: *const LV2_Atom_Sequence, urid_map: &SamplerUris) {
-
-    let mut m = MidiEventExtractor::new(urid_map.midi_Event);
-
-    extract_sequence(seq, vec!(&mut m));
-
-    for data in m.midi_data {
-        println!("{} -> {:x} {:x} {:x}", data.time_frames, data.status, data.pitch, data.velocity);
     }
 }
 
@@ -121,7 +112,7 @@ extern fn instantiate(descriptor: *const LV2_Descriptor,
     let mut amp = Box::new(Amp {
         input: std::ptr::null_mut(),
         output: std::ptr::null_mut(),
-        samplerUris: map_sampler_uris(urid_map)
+        samplerUris: map_sampler_uris(urid_map),
     });
     Box::into_raw(amp) as LV2_Handle
 }
@@ -153,7 +144,11 @@ extern fn run(instance: LV2_Handle, n_samples: u32) {
     unsafe {
         let input = (*amp).input;
 
-        do_extract_seq(input, &(*amp).samplerUris);
+        let midi_data = extract_sequence(input, (*amp).samplerUris.midi_Event, MidiData::new);
+
+        for data in midi_data {
+            println!("{} -> {:x} {:x} {:x}", data.time_frames, data.status, data.pitch, data.velocity);
+        }
 
         let output: &mut [f32] = std::slice::from_raw_parts_mut((*amp).output, n_samples as usize);
 

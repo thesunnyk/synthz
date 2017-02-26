@@ -10,34 +10,16 @@ pub struct MidiData {
     pub velocity: u8,
 }
 
-pub struct MidiEventExtractor {
-    midi_event_urid: urid::LV2_URID,
-    pub midi_data: Vec<MidiData>
-}
-
-impl MidiEventExtractor {
-    pub fn new(midiEvent_urid: urid::LV2_URID) -> MidiEventExtractor {
-        MidiEventExtractor {
-            midi_event_urid: midiEvent_urid,
-            midi_data: Vec::new(),
-        }
-    }
-}
-
-impl atom::EventExtractor for MidiEventExtractor {
-    fn matches(&self, current: urid::LV2_URID) -> bool {
-        self.midi_event_urid == current
-    }
-
-    fn store(&mut self, data: *const u8, size: usize, time_frames: i64) {
+impl MidiData {
+    pub fn new(data: *const u8, size: usize, time_frames: i64) -> MidiData {
         assert_eq!(3, size);
         unsafe {
-            self.midi_data.push(MidiData {
+            MidiData {
                 time_frames: time_frames,
                 status: *data,
                 pitch: *data.offset(1),
                 velocity: *data.offset(2),
-            });
+            }
         }
     }
 }

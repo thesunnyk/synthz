@@ -1,5 +1,6 @@
 
 use std::mem;
+use std::collections::BTreeMap;
 use lv2_raw::atom::*;
 use lv2_raw::urid::LV2_URID as LV2_URID;
 
@@ -60,22 +61,19 @@ impl Iterator for AtomSequenceIter {
     }
 }
 
-pub trait EventExtractor {
-    fn matches(&self, urid: LV2_URID) -> bool;
-    fn store(&mut self, data: *const u8, size: usize, time_frames: i64);
-}
-
-// TODO Use BTreeMap
-pub fn extract_sequence(seq: *const LV2_Atom_Sequence, mut extractors: Vec<&mut EventExtractor>) {
+pub fn extract_sequence<T>(seq: *const LV2_Atom_Sequence,
+                           urid: LV2_URID,
+                           xform: fn (*const u8, usize, i64) -> T) -> Vec<T> {
+    let mut ret = Vec::new();
 
     let iter: AtomSequenceIter = AtomSequenceIter::new(seq);
 
     for event in iter {
-        for extractor in &mut extractors {
-            if extractor.matches(event.data_type) {
-                extractor.store(event.data, event.size, event.time_frames);
-            }
+        if event.data_type == urid {
+            ret.push(xform(event.data, event.size, event.time_frames));
         }
     }
+
+    ret
 }
 
