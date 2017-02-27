@@ -4,6 +4,7 @@ mod lv2;
 
 use std::ptr;
 use std::mem;
+use std::f32;
 use std::ffi;
 use std::os::raw;
 use std::collections::BTreeMap;
@@ -54,6 +55,8 @@ pub fn map_sampler_uris(map: *const LV2_URID_Map) -> SamplerUris {
 struct Amp {
     input: *const LV2_Atom_Sequence,
     output: *mut f32,
+    rate: f32,
+    t: u64,
     samplerUris: SamplerUris,
 }
 
@@ -112,6 +115,8 @@ extern fn instantiate(descriptor: *const LV2_Descriptor,
     let mut amp = Box::new(Amp {
         input: std::ptr::null_mut(),
         output: std::ptr::null_mut(),
+        rate: rate as f32,
+        t: 0,
         samplerUris: map_sampler_uris(urid_map),
     });
     Box::into_raw(amp) as LV2_Handle
@@ -139,6 +144,36 @@ extern fn activate(instance: LV2_Handle) {
 extern fn deactivate(instance: LV2_Handle) {
 }
 
+struct ToneIterator {
+    freq: f32,
+    t: u64,
+    rate: f32,
+}
+
+impl Iterator for ToneIterator {
+    type Item = f32;
+
+    fn next(&mut self) -> Option<f32> {
+        let t: f32 = self.t as f32;
+        self.t = self.t + 1;
+
+        Some(0.6 * f32::sin(t * self.freq * 2.0 * f32::consts::PI / self.rate))
+    }
+}
+
+fn process(t: u64, rate: f32, midi_data: Vec<MidiData>) -> ToneIterator {
+    // for data in midi_data {
+    //     println!("{} -> {:x} {:x} {:x}", data.time_frames, data.status, data.pitch, data.velocity);
+    // }
+    //
+
+    ToneIterator {
+        freq: 800.0,
+        t: t,
+        rate: rate
+    }
+}
+
 extern fn run(instance: LV2_Handle, n_samples: u32) {
     let mut amp: *mut Amp = instance as *mut Amp;
     unsafe {
@@ -146,11 +181,14 @@ extern fn run(instance: LV2_Handle, n_samples: u32) {
 
         let midi_data = extract_sequence(input, (*amp).samplerUris.midi_Event, MidiData::new);
 
-        for data in midi_data {
-            println!("{} -> {:x} {:x} {:x}", data.time_frames, data.status, data.pitch, data.velocity);
-        }
-
         let output: &mut [f32] = std::slice::from_raw_parts_mut((*amp).output, n_samples as usize);
+
+        let mut samples = process((*amp).t, (*amp).rate, midi_data);
+
+        for i in 0..output.len() {
+            output[i as usize] = samples.next().unwrap();
+        }
+        (*amp).t = (*amp).t + n_samples as u64;
 
     }
 }
