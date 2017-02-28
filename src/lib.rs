@@ -145,9 +145,9 @@ extern fn deactivate(instance: LV2_Handle) {
 }
 
 struct ToneIterator {
-    freq: f32,
     t: u64,
     rate: f32,
+    data: Vec<MidiData>
 }
 
 impl Iterator for ToneIterator {
@@ -157,20 +157,28 @@ impl Iterator for ToneIterator {
         let t: f32 = self.t as f32;
         self.t = self.t + 1;
 
-        Some(0.6 * f32::sin(t * self.freq * 2.0 * f32::consts::PI / self.rate))
+        let mut vol = 0.0;
+        let mut freq = 0.0;
+        for data in &self.data {
+            if data.status == LV2_MIDI_MSG_NOTE_ON {
+                vol = 0.6;
+                let pitch: f32 = (data.pitch as i32 - 69) as f32;
+                freq = (2.0 as f32).powf(pitch/12.0) * 440.0;
+            }
+        }
+        //
+        // f(n) = 2^((n-69)/12)*440 // where n = midi note
+
+        Some(vol * f32::sin(t * freq * 2.0 * f32::consts::PI / self.rate))
     }
 }
 
 fn process(t: u64, rate: f32, midi_data: Vec<MidiData>) -> ToneIterator {
-    // for data in midi_data {
-    //     println!("{} -> {:x} {:x} {:x}", data.time_frames, data.status, data.pitch, data.velocity);
-    // }
-    //
 
     ToneIterator {
-        freq: 800.0,
         t: t,
-        rate: rate
+        rate: rate,
+        data: midi_data,
     }
 }
 
