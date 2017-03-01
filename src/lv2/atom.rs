@@ -61,19 +61,3 @@ impl Iterator for AtomSequenceIter {
     }
 }
 
-pub fn extract_sequence<T>(seq: *const LV2_Atom_Sequence,
-                           urid: LV2_URID,
-                           xform: fn (*const u8, usize, i64) -> T) -> Vec<T> {
-    let mut ret = Vec::new();
-
-    let iter: AtomSequenceIter = AtomSequenceIter::new(seq);
-
-    for event in iter {
-        if event.data_type == urid {
-            ret.push(xform(event.data, event.size, event.time_frames));
-        }
-    }
-
-    ret
-}
-

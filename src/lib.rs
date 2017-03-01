@@ -1,6 +1,7 @@
 
 mod lv2_raw;
 mod lv2;
+mod synth;
 
 use std::ptr;
 use std::mem;
@@ -55,8 +56,7 @@ pub fn map_sampler_uris(map: *const LV2_URID_Map) -> SamplerUris {
 struct Amp {
     input: *const LV2_Atom_Sequence,
     output: *mut f32,
-    rate: f32,
-    t: u64,
+    synth: synth::ToneIterator,
     samplerUris: SamplerUris,
 }
 
@@ -115,8 +115,7 @@ extern fn instantiate(descriptor: *const LV2_Descriptor,
     let mut amp = Box::new(Amp {
         input: std::ptr::null_mut(),
         output: std::ptr::null_mut(),
-        rate: rate as f32,
-        t: 0,
+        synth: synth::ToneIterator::new(rate as f32),
         samplerUris: map_sampler_uris(urid_map),
     });
     Box::into_raw(amp) as LV2_Handle
@@ -144,42 +143,19 @@ extern fn activate(instance: LV2_Handle) {
 extern fn deactivate(instance: LV2_Handle) {
 }
 
-struct ToneIterator {
-    t: u64,
-    rate: f32,
-    data: Vec<MidiData>
-}
+fn extract_sequence(seq: *const LV2_Atom_Sequence,
+                    urid: LV2_URID) -> Vec<synth::SynthEvent> {
+    let mut ret = Vec::new();
 
-impl Iterator for ToneIterator {
-    type Item = f32;
+    let iter: AtomSequenceIter = AtomSequenceIter::new(seq);
 
-    fn next(&mut self) -> Option<f32> {
-        let t: f32 = self.t as f32;
-        self.t = self.t + 1;
-
-        let mut vol = 0.0;
-        let mut freq = 0.0;
-        for data in &self.data {
-            if data.status == LV2_MIDI_MSG_NOTE_ON {
-                vol = 0.6;
-                let pitch: f32 = (data.pitch as i32 - 69) as f32;
-                freq = (2.0 as f32).powf(pitch/12.0) * 440.0;
-            }
+    for event in iter {
+        if event.data_type == urid {
+            ret.push(synth::SynthEvent::MidiEvent(MidiData::new(event.data, event.size, event.time_frames)));
         }
-        //
-        // f(n) = 2^((n-69)/12)*440 // where n = midi note
-
-        Some(vol * f32::sin(t * freq * 2.0 * f32::consts::PI / self.rate))
     }
-}
 
-fn process(t: u64, rate: f32, midi_data: Vec<MidiData>) -> ToneIterator {
-
-    ToneIterator {
-        t: t,
-        rate: rate,
-        data: midi_data,
-    }
+    ret
 }
 
 extern fn run(instance: LV2_Handle, n_samples: u32) {
@@ -187,17 +163,18 @@ extern fn run(instance: LV2_Handle, n_samples: u32) {
     unsafe {
         let input = (*amp).input;
 
-        let midi_data = extract_sequence(input, (*amp).samplerUris.midi_Event, MidiData::new);
+        let midi_data = extract_sequence(input, (*amp).samplerUris.midi_Event);
 
         let output: &mut [f32] = std::slice::from_raw_parts_mut((*amp).output, n_samples as usize);
 
-        let mut samples = process((*amp).t, (*amp).rate, midi_data);
+        let synth = &mut (*amp).synth;
+
+        synth.add_data(midi_data);
 
         for i in 0..output.len() {
-            output[i as usize] = samples.next().unwrap();
+            output[i as usize] = synth.next().unwrap();
         }
-        (*amp).t = (*amp).t + n_samples as u64;
-
+        synth.clear_data();
     }
 }
 
