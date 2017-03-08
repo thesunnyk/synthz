@@ -94,7 +94,7 @@ impl Oscillator {
     fn new(rate: f32) -> Oscillator {
         let a = rate as i64 * 10 / 1000;
         let d = rate as i64 * 13 / 1000;
-        let s = 0.8;
+        let s = 0.6;
         let r = rate as i64 * 100 / 1000;
         Oscillator {
             freq: 0.0,
@@ -121,8 +121,10 @@ impl Oscillator {
         note == self.note
     }
 
-    fn end_note(&mut self, end_t: i64) {
-        self.end_t = end_t;
+    fn end_note(&mut self, t: i64, end_t: i64) {
+        if t < self.end_t {
+            self.end_t = end_t;
+        }
     }
 
     fn oscillate(&self, t: i64) -> f32 {
@@ -173,7 +175,7 @@ impl ToneIterator {
                 if self.old_t != t {
                     if t < self.old_t {
                         for mut osc in &mut self.osc {
-                            osc.end_note(0);
+                            osc.end_note(0, 0);
                         }
                     }
                     self.old_t = t;
@@ -196,7 +198,7 @@ impl ToneIterator {
                     raw_midi::LV2_MIDI_MSG_NOTE_OFF => {
                         println!("MDF {}, {}", midi_data.pitch, data.time_frames);
                         self.osc.iter_mut().find(|x| x.is_note(midi_data.pitch as i32))
-                            .map(|mut x| x.end_note(t + data.time_frames));
+                            .map(|mut x| x.end_note(t, t + data.time_frames));
                     },
                     _ => {
                         println!("MIDI({}), {}, @{}", midi_data.status, midi_data.pitch, data.time_frames);
