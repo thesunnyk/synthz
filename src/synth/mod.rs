@@ -29,19 +29,51 @@ pub enum SynthProperty {
     Speed(f32),
 }
 
-fn envelope(r_t: i64) -> f32 {
-    if r_t < 500 {
-        r_t as f32 / 500.0
-    } else {
-        500.0 / r_t as f32
+struct Envelope {
+    a: f32,
+    d: f32,
+    s: f32,
+    r: f32,
+}
+
+impl Envelope {
+    fn new(a: i64, d: i64, s: f32, r: i64) -> Envelope {
+        Envelope {
+            a: a as f32,
+            d: d as f32,
+            s: s,
+            r: r as f32,
+        }
+    }
+
+    fn envelope(&self, e_t: i64, r_t: i64) -> f32 {
+        let rt = r_t as f32;
+        let et = e_t as f32;
+
+        let ad = self.a + self.d;
+        let er = et + self.r;
+
+        if rt < self.a {
+            rt / self.a
+        } else if rt < ad {
+            (1.0 - self.s) * ((ad - rt) / self.d) + self.s
+        } else if rt < et {
+            self.s
+        } else if rt < er {
+            self.s * (er - rt) / self.r
+        } else {
+            0.0
+        }
     }
 }
 
 struct Oscillator {
     freq: f32,
+    velocity: f32,
     rate: f32,
     start_t: i64,
     end_t: i64,
+    envelope: Envelope,
 }
 
 impl Oscillator {
@@ -50,19 +82,25 @@ impl Oscillator {
         (2.0 as f32).powf(pitch/12.0) * 440.0
     }
 
-    fn new() -> Oscillator {
+    fn new(rate: f32) -> Oscillator {
+        let a = rate as i64 * 10 / 1000;
+        let d = rate as i64 * 13 / 1000;
+        let s = 0.8;
+        let r = rate as i64 * 100 / 1000;
         Oscillator {
             freq: 0.0,
-            rate: 0.0,
+            rate: rate,
+            velocity: 0.0,
             start_t: i64::max_value(),
             end_t: i64::max_value(),
+            envelope: Envelope::new(a, d, s, r),
         }
     }
 
-    fn config(&mut self, note: i32, rate: f32, start_t: i64) {
+    fn config(&mut self, note: i32, velocity: f32, start_t: i64) {
         self.freq = Oscillator::get_freq(note);
-        self.rate = rate;
         self.start_t = start_t;
+        self.velocity = velocity;
         self.end_t = i64::max_value();
     }
 
@@ -71,8 +109,9 @@ impl Oscillator {
     }
 
     fn oscillate(&self, t: i64) -> f32 {
-        if self.start_t < t && t < self.end_t {
-            0.6 * f32::sin(t as f32 * self.freq * 2.0 * f32::consts::PI / self.rate)
+        if self.start_t < t {
+            let env = self.envelope.envelope(self.end_t - self.start_t, t - self.start_t);
+            env * self.velocity * f32::sin(t as f32 * self.freq * 2.0 * f32::consts::PI / self.rate)
         } else {
             0.0
         }
@@ -96,7 +135,7 @@ impl ToneIterator {
             speed: 1.0,
             rate: rate,
             cur_note: 0,
-            osc: Oscillator::new(),
+            osc: Oscillator::new(rate),
         }
     }
 
@@ -121,16 +160,20 @@ impl ToneIterator {
                 match midi_data.status {
                     raw_midi::LV2_MIDI_MSG_NOTE_ON => {
                         if self.cur_note != midi_data.pitch as i32 {
-                            println!("MDO {}, {}", midi_data.pitch, data.time_frames);
+                            println!("MDO {}, {}, {}, {}", midi_data.pitch, data.time_frames, self.t,
+                                     self.t + data.time_frames);
                             self.cur_note = midi_data.pitch as i32;
-                            self.osc.config(midi_data.pitch as i32, self.rate, self.old_t + data.time_frames);
+                            // TODO Velocity as log
+                            self.osc.config(midi_data.pitch as i32,
+                                            midi_data.velocity as f32 / 127.0,
+                                            self.t + data.time_frames);
                         }
                     },
                     raw_midi::LV2_MIDI_MSG_NOTE_OFF => {
                         if self.cur_note == midi_data.pitch as i32 {
                             println!("MDF {}, {}", midi_data.pitch, data.time_frames);
                             self.cur_note = -1;
-                            self.osc.end_time(data.time_frames);
+                            self.osc.end_time(self.t + data.time_frames);
                         }
                     },
                     _ => {
