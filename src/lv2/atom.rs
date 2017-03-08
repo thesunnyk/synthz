@@ -31,9 +31,15 @@ impl AtomSequenceIter {
             }
         }
     }
+
+    pub fn get_time_unit_urid(&self) -> LV2_URID {
+        unsafe {
+            (*self.seq).body.unit as LV2_URID
+        }
+    }
 }
 
-fn pad_size(size: u32) -> usize {
+pub fn pad_size(size: u32) -> usize {
     let seven: usize = 7;
 
     (size as usize + seven) & !seven
@@ -59,5 +65,21 @@ impl Iterator for AtomSequenceIter {
             }
         }
     }
+}
+
+pub struct AtomObject {
+    pub otype: LV2_URID,
+    pub items: Vec<AtomProperty>,
+}
+
+pub enum AtomItem {
+    AtomFloat(f32),
+    AtomLong(i64),
+}
+
+pub struct AtomProperty {
+    pub key: LV2_URID,
+    pub context: u32,
+    pub item: AtomItem,
 }
 

@@ -22,9 +22,15 @@ use lv2::midi::*;
 const ControlInput: u32 = 0;
 const SynthOutput: u32 = 1;
 
+#[derive(Debug)]
 pub struct SamplerUris {
     pub atom_Blank: LV2_URID,
+    pub atom_Int: LV2_URID,
+    pub atom_Long: LV2_URID,
+    pub atom_Float: LV2_URID,
+    pub atom_Object: LV2_URID,
     pub atom_Path: LV2_URID,
+    pub atom_Property: LV2_URID,
     pub atom_Resource: LV2_URID,
     pub atom_Sequence: LV2_URID,
     pub atom_URID: LV2_URID,
@@ -33,12 +39,21 @@ pub struct SamplerUris {
     pub patch_Set: LV2_URID,
     pub patch_property: LV2_URID,
     pub patch_value: LV2_URID,
+    pub time_frame: LV2_URID,
+    pub time_framesPerSecond: LV2_URID,
+    pub time_speed: LV2_URID,
+    pub time_Position: LV2_URID,
 }
 
 pub fn map_sampler_uris(map: *const LV2_URID_Map) -> SamplerUris {
     SamplerUris {
         atom_Blank: urid_for_const(map, LV2_ATOM_Blank),
+        atom_Int: urid_for_const(map, LV2_ATOM_Int),
+        atom_Long: urid_for_const(map, LV2_ATOM_Long),
+        atom_Float: urid_for_const(map, LV2_ATOM_Float),
+        atom_Object: urid_for_const(map, LV2_ATOM_Object),
         atom_Path: urid_for_const(map, LV2_ATOM_Path),
+        atom_Property: urid_for_const(map, LV2_ATOM_Property),
         atom_Resource: urid_for_const(map, LV2_ATOM_Resource),
         atom_Sequence: urid_for_const(map, LV2_ATOM_Sequence),
         atom_URID: urid_for_const(map, LV2_ATOM_URID),
@@ -49,12 +64,17 @@ pub fn map_sampler_uris(map: *const LV2_URID_Map) -> SamplerUris {
         patch_Set: urid_for_const(map, LV2_PATCH_Set),
         patch_property: urid_for_const(map, LV2_PATCH_property),
         patch_value: urid_for_const(map, LV2_PATCH_value),
+
+        time_frame: urid_for_const(map, LV2_TIME_frame),
+        time_framesPerSecond: urid_for_const(map, LV2_TIME_framesPerSecond),
+        time_speed: urid_for_const(map, LV2_TIME_speed),
+        time_Position: urid_for_const(map, LV2_TIME_Position),
     }
 }
 
 #[repr(C)]
 struct Amp {
-    input: *const LV2_Atom_Sequence,
+    input: *const LV2_Atom,
     output: *mut f32,
     synth: synth::ToneIterator,
     samplerUris: SamplerUris,
@@ -112,12 +132,15 @@ extern fn instantiate(descriptor: *const LV2_Descriptor,
 
     let mut urid_map = urid_extractor.urid_map.unwrap();
 
+
     let mut amp = Box::new(Amp {
         input: std::ptr::null_mut(),
         output: std::ptr::null_mut(),
         synth: synth::ToneIterator::new(rate as f32),
         samplerUris: map_sampler_uris(urid_map),
     });
+
+    println!("{:?}", amp.samplerUris);
     Box::into_raw(amp) as LV2_Handle
 }
 
@@ -127,7 +150,7 @@ extern fn connect_port(instance: LV2_Handle, port: u32, data: *mut raw::c_void) 
     unsafe {
         match port {
             ControlInput => {
-                (*amp).input = data as *const LV2_Atom_Sequence
+                (*amp).input = data as *const LV2_Atom
             },
             SynthOutput => {
                 (*amp).output = data as *mut f32
@@ -143,38 +166,78 @@ extern fn activate(instance: LV2_Handle) {
 extern fn deactivate(instance: LV2_Handle) {
 }
 
-fn extract_sequence(seq: *const LV2_Atom_Sequence,
-                    urid: LV2_URID) -> Vec<synth::SynthEvent> {
+fn extract_sequence(seq: *const LV2_Atom_Sequence, s: &SamplerUris) -> Vec<synth::SynthEvent> {
     let mut ret = Vec::new();
 
     let iter: AtomSequenceIter = AtomSequenceIter::new(seq);
 
+    // println!("Time unit URID: {}", iter.get_time_unit_urid());
     for event in iter {
-        if event.data_type == urid {
-            ret.push(synth::SynthEvent::MidiEvent(MidiData::new(event.data, event.size, event.time_frames)));
+        if event.data_type == s.midi_Event {
+            ret.push(synth::SynthEvent::new(event.time_frames,
+                                     synth::SynthEventBody::MidiEvent(MidiData::new(event.data, event.size))));
+        } else if event.data_type == s.atom_Object || event.data_type == s.atom_Blank {
+            let properties = synth::SynthEventBody::SynthProperties(
+                extract_object(event.data as *const LV2_Atom_Object_Body, event.size, s));
+            ret.push(synth::SynthEvent::new(event.time_frames, properties));
         }
     }
 
     ret
 }
 
+fn extract_object(obj: *const LV2_Atom_Object_Body,
+                  size: usize,
+                  uris: &SamplerUris) -> Vec<synth::SynthProperty> {
+    unsafe {
+        let oType = (*obj).otype;
+        let mut processed: usize = mem::size_of::<LV2_Atom_Object_Body>();
+        let mut items: Vec<synth::SynthProperty> = Vec::new();
+
+        while processed < size {
+            let pboffset = (obj as usize).checked_add(processed).unwrap();
+            let pbody: *const LV2_Atom_Property_Body = pboffset as *const LV2_Atom_Property_Body;
+            let body = &*pbody;
+
+            // TODO Get BPM, Bar (?), and BarBeat (?), BeatsPerBar (?)
+            if body.key == uris.time_frame {
+                assert_eq!(body.value.size as usize, mem::size_of::<i64>());
+                assert_eq!(body.value.atom_type, uris.atom_Long);
+                let value = pbody.offset(1) as *const i64;
+                items.push(synth::SynthProperty::Frame(*value));
+            } else if body.key == uris.time_speed {
+                assert_eq!(body.value.size as usize, mem::size_of::<f32>());
+                assert_eq!(body.value.atom_type, uris.atom_Float);
+                let value = pbody.offset(1) as *const f32;
+                items.push(synth::SynthProperty::Speed(*value));
+            }
+            processed = processed + pad_size(body.value.size) as usize + mem::size_of::<LV2_Atom_Property_Body>();
+        }
+        items
+    }
+}
+
 extern fn run(instance: LV2_Handle, n_samples: u32) {
     let mut amp: *mut Amp = instance as *mut Amp;
     unsafe {
-        let input = (*amp).input;
+        let pinput = (*amp).input;
 
-        let midi_data = extract_sequence(input, (*amp).samplerUris.midi_Event);
+        let input = &*pinput;
 
-        let output: &mut [f32] = std::slice::from_raw_parts_mut((*amp).output, n_samples as usize);
+        let uris = &(*amp).samplerUris;
 
         let synth = &mut (*amp).synth;
 
-        synth.add_data(midi_data);
+        if input.atom_type == uris.atom_Sequence {
+            let midi_data = extract_sequence(pinput as *const LV2_Atom_Sequence, uris);
+            synth.add_data(midi_data);
+        }
+
+        let output: &mut [f32] = std::slice::from_raw_parts_mut((*amp).output, n_samples as usize);
 
         for i in 0..output.len() {
             output[i as usize] = synth.next().unwrap();
         }
-        synth.clear_data();
     }
 }
 

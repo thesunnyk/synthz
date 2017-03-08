@@ -13,6 +13,10 @@ pub const LV2_PATCH_Set: *const u8 = b"http://lv2plug.in/ns/ext/patch#Set\0" as 
 pub const LV2_PATCH_property: *const u8 = b"http://lv2plug.in/ns/ext/patch#property\0" as *const u8;
 pub const LV2_PATCH_value: *const u8 = b"http://lv2plug.in/ns/ext/patch#value\0" as *const u8;
 
+pub const LV2_TIME_frame: *const u8 = b"http://lv2plug.in/ns/ext/time#frame\0" as *const u8;
+pub const LV2_TIME_framesPerSecond: *const u8 = b"http://lv2plug.in/ns/ext/time#framesPerSecond\0" as *const u8;
+pub const LV2_TIME_speed: *const u8 = b"http://lv2plug.in/ns/ext/time#speed\0" as *const u8;
+pub const LV2_TIME_Position: *const u8 = b"http://lv2plug.in/ns/ext/time#Position\0" as *const u8;
 
 #[repr(C)]
 pub struct LV2_URID_Map {
