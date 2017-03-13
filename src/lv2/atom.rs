@@ -49,7 +49,7 @@ impl Iterator for AtomSequenceIter {
     type Item = SequenceData;
 
     fn next(&mut self) -> Option<SequenceData> {
-        if self.next as usize > self.total {
+        if self.next as usize >= self.total {
             None
         } else {
             unsafe {

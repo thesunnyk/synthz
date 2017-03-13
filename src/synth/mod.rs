@@ -107,8 +107,8 @@ impl Oscillator {
         }
     }
 
-    fn config(&mut self, note: i32, velocity: f32, start_t: i64, t: i64) {
-        if t > self.end_t {
+    fn config(&mut self, note: i32, velocity: f32, start_t: i64) {
+        if start_t > self.end_t {
             self.freq = Oscillator::get_freq(note);
             self.note = note;
             self.start_t = start_t;
@@ -121,8 +121,8 @@ impl Oscillator {
         note == self.note
     }
 
-    fn end_note(&mut self, t: i64, end_t: i64) {
-        if t < self.end_t {
+    fn end_note(&mut self, end_t: i64) {
+        if end_t < self.end_t {
             self.end_t = end_t;
         }
     }
@@ -140,7 +140,6 @@ impl Oscillator {
 pub struct ToneIterator {
     t: i64,
     old_t: i64,
-    speed: f32,
     rate: f32,
     osc: Vec<Oscillator>,
 }
@@ -155,7 +154,6 @@ impl ToneIterator {
         ToneIterator {
             t: 0,
             old_t: 0,
-            speed: 1.0,
             rate: rate,
             osc: vec,
         }
@@ -163,42 +161,21 @@ impl ToneIterator {
 
     pub fn add_data(&mut self, events: Vec<SynthEvent>) {
         for data in events.as_slice() { match &data.body {
-            &SynthEventBody::SynthProperties(ref p) => {
-                let mut speed = self.speed;
-                let mut t = self.t;
-                for i in p {
-                    match i {
-                        &SynthProperty::Speed(ref s) => { speed = *s },
-                        &SynthProperty::Frame(ref f) => { t = *f }
-                    }
-                }
-                if self.old_t != t {
-                    if t < self.old_t {
-                        for mut osc in &mut self.osc {
-                            osc.end_note(0, 0);
-                        }
-                    }
-                    self.old_t = t;
-                    self.t = t;
-                    self.speed = speed;
-                }
-            },
+            &SynthEventBody::SynthProperties(ref p) => { },
             &SynthEventBody::MidiEvent(ref midi_data) => {
                 let t = self.t;
                 match midi_data.status {
                     raw_midi::LV2_MIDI_MSG_NOTE_ON => {
-                        println!("MDO {}, {}, {}, {}", midi_data.pitch, data.time_frames, self.t,
-                                 self.t + data.time_frames);
+                        midi_data.pitch, midi_data.velocity, t + data.time_frames);
                         // TODO Velocity as log
                         self.osc.iter_mut().find(|x| x.free_for(t, midi_data.pitch as i32))
                             .map(|mut x| x.config(midi_data.pitch as i32,
                                                   midi_data.velocity as f32 / 127.0,
-                                                  t + data.time_frames, t));
+                                                  t + data.time_frames));
                     },
                     raw_midi::LV2_MIDI_MSG_NOTE_OFF => {
-                        println!("MDF {}, {}", midi_data.pitch, data.time_frames);
                         self.osc.iter_mut().find(|x| x.is_note(midi_data.pitch as i32))
-                            .map(|mut x| x.end_note(t, t + data.time_frames));
+                            .map(|mut x| x.end_note(t + data.time_frames));
                     },
                     _ => {
                         println!("MIDI({}), {}, @{}", midi_data.status, midi_data.pitch, data.time_frames);
@@ -216,9 +193,7 @@ impl Iterator for ToneIterator {
     type Item = f32;
 
     fn next(&mut self) -> Option<f32> {
-        if self.speed > 0.0 {
-            self.t = self.t + 1;
-        }
+        self.t = self.t + 1;
 
         let mut result = self.osc.iter().fold(0.0, |x, y| x + y.oscillate(self.t));
 
