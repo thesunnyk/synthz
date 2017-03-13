@@ -67,20 +67,42 @@ impl Envelope {
     }
 }
 
+enum WaveType {
+    Sine(f32, f32),
+    Square(f32, f32),
+    Sawtooth(f32, f32),
+    Triangle(f32, f32)
+}
+
+impl WaveType {
+    fn oscillate(&self, t: f32, sec: f32) -> f32 {
+        match self {
+            &WaveType::Sine(f, v) => {
+                v * f32::sin(f * t + sec)
+            }
+            _ => {
+                0.0
+            }
+        }
+    }
+}
+
 struct Oscillator {
     note: i32,
-    freq: f32,
-    velocity: f32,
     rate: f32,
     start_t: i64,
     end_t: i64,
+    primary: WaveType,
+    secondary: Option<WaveType>,
     envelope: Envelope,
 }
 
 impl Oscillator {
-    fn get_freq(note: i32) -> f32 {
+    fn get_angular_freq(note: i32, rate: f32) -> f32 {
         let pitch: f32 = (note as i32 - 69) as f32;
-        (2.0 as f32).powf(pitch/12.0) * 440.0
+        let freq_hz = (2.0 as f32).powf(pitch/12.0) * 440.0;
+        let omega = 2.0 * f32::consts::PI / rate;
+        freq_hz * omega
     }
 
     fn free_for(&self, t: i64, note: i32) -> bool {
@@ -97,23 +119,26 @@ impl Oscillator {
         let s = 0.6;
         let r = rate as i64 * 100 / 1000;
         Oscillator {
-            freq: 0.0,
             note: 0,
             rate: rate,
-            velocity: 0.0,
             start_t: i64::max_value(),
             end_t: 0,
             envelope: Envelope::new(a, d, s, r),
+            primary: WaveType::Sine(0.0, 0.0),
+            secondary: None
         }
     }
 
     fn config(&mut self, note: i32, velocity: f32, start_t: i64) {
         if start_t > self.end_t {
-            self.freq = Oscillator::get_freq(note);
             self.note = note;
             self.start_t = start_t;
-            self.velocity = velocity;
             self.end_t = i64::max_value();
+
+            let freq = Oscillator::get_angular_freq(note, self.rate);
+            let velocity = velocity;
+            self.primary = WaveType::Sine(freq, velocity);
+            self.secondary = Some(WaveType::Sine(freq * 2.0, 0.4));
         }
     }
 
@@ -130,7 +155,9 @@ impl Oscillator {
     fn oscillate(&self, t: i64) -> f32 {
         if self.start_t < t {
             let env = self.envelope.envelope(self.end_t - self.start_t, t - self.start_t);
-            env * self.velocity * f32::sin(t as f32 * self.freq * 2.0 * f32::consts::PI / self.rate)
+            let secwave = self.secondary.as_ref().map_or(0.0, |s| s.oscillate(t as f32, 0.0));
+
+            env * self.primary.oscillate(t as f32, secwave)
         } else {
             0.0
         }
@@ -166,7 +193,6 @@ impl ToneIterator {
                 let t = self.t;
                 match midi_data.status {
                     raw_midi::LV2_MIDI_MSG_NOTE_ON => {
-                        midi_data.pitch, midi_data.velocity, t + data.time_frames);
                         // TODO Velocity as log
                         self.osc.iter_mut().find(|x| x.free_for(t, midi_data.pitch as i32))
                             .map(|mut x| x.config(midi_data.pitch as i32,
