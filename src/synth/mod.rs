@@ -19,7 +19,7 @@ impl SynthEvent {
 }
 
 pub enum SynthEventBody {
-    MidiEvent(midi::MidiData),
+    MidiData(midi::MidiEvent),
     SynthProperties(Vec<SynthProperty>),
 }
 
@@ -69,7 +69,7 @@ impl Envelope {
 
 enum WaveType {
     Sine(f32, f32),
-    Square(f32, f32),
+    Square(f32, f32, f32),
     Sawtooth(f32, f32),
     Triangle(f32, f32)
 }
@@ -79,9 +79,23 @@ impl WaveType {
         match self {
             &WaveType::Sine(f, v) => {
                 v * f32::sin(f * t + sec)
-            }
-            _ => {
-                0.0
+            },
+            &WaveType::Square(f, v, d) => {
+                if (f * t) % 1.0 < d {
+                    v / 2.0
+                } else {
+                    -v / 2.0
+                }
+            },
+            &WaveType::Sawtooth(f, v) => {
+                v * (2.0 * ((f * t) % 1.0) - 1.0)
+            },
+            &WaveType::Triangle(f, v) => {
+                if f % 1.0 < 0.5 {
+                    v * (2.0 * ((2.0 * f * t) % 1.0) - 1.0)
+                } else {
+                    -v * (2.0 * ((2.0 * f * t) % 1.0) + 1.0)
+                }
             }
         }
     }
@@ -189,22 +203,22 @@ impl ToneIterator {
     pub fn add_data(&mut self, events: Vec<SynthEvent>) {
         for data in events.as_slice() { match &data.body {
             &SynthEventBody::SynthProperties(ref p) => { },
-            &SynthEventBody::MidiEvent(ref midi_data) => {
+            &SynthEventBody::MidiData(ref midi_ev) => {
                 let t = self.t;
-                match midi_data.status {
-                    raw_midi::LV2_MIDI_MSG_NOTE_ON => {
+                match midi_ev {
+                    &midi::MidiEvent::NoteOn { note_num, velocity } => {
                         // TODO Velocity as log
-                        self.osc.iter_mut().find(|x| x.free_for(t, midi_data.pitch as i32))
-                            .map(|mut x| x.config(midi_data.pitch as i32,
-                                                  midi_data.velocity as f32 / 127.0,
+                        self.osc.iter_mut().find(|x| x.free_for(t, note_num as i32))
+                            .map(|mut x| x.config(note_num as i32,
+                                                  velocity as f32 / 127.0,
                                                   t + data.time_frames));
                     },
-                    raw_midi::LV2_MIDI_MSG_NOTE_OFF => {
-                        self.osc.iter_mut().find(|x| x.is_note(midi_data.pitch as i32))
+                    &midi::MidiEvent::NoteOff { note_num, velocity } => {
+                        self.osc.iter_mut().find(|x| x.is_note(note_num as i32))
                             .map(|mut x| x.end_note(t + data.time_frames));
                     },
                     _ => {
-                        println!("MIDI({}), {}, @{}", midi_data.status, midi_data.pitch, data.time_frames);
+                        println!("MIDI {:?} @{}", midi_ev, data.time_frames);
                     }
                 }
             },

@@ -175,7 +175,7 @@ fn extract_sequence(seq: *const LV2_Atom_Sequence, s: &SamplerUris) -> Vec<synth
     for event in iter {
         if event.data_type == s.midi_Event {
             ret.push(synth::SynthEvent::new(event.time_frames,
-                                     synth::SynthEventBody::MidiEvent(MidiData::new(event.data, event.size))));
+                                     synth::SynthEventBody::MidiData(MidiEvent::new(event.data, event.size))));
         } else if event.data_type == s.atom_Object || event.data_type == s.atom_Blank {
             let properties = synth::SynthEventBody::SynthProperties(
                 extract_object(event.data as *const LV2_Atom_Object_Body, event.size, s));
