@@ -78,23 +78,26 @@ impl WaveType {
     fn oscillate(&self, t: f32, sec: f32) -> f32 {
         match self {
             &WaveType::Sine(f, v) => {
-                v * f32::sin(f * t + sec)
+                let omega = 2.0 * f32::consts::PI;
+                v * f32::sin(f * t * omega + sec)
             },
             &WaveType::Square(f, v, d) => {
-                if (f * t) % 1.0 < d {
+                if (f * t + sec) % 1.0 < d {
                     v / 2.0
                 } else {
                     -v / 2.0
                 }
             },
             &WaveType::Sawtooth(f, v) => {
-                v * (2.0 * ((f * t) % 1.0) - 1.0)
+                v * (2.0 * ((f * t + sec) % 1.0) - 1.0)
             },
             &WaveType::Triangle(f, v) => {
-                if f % 1.0 < 0.5 {
-                    v * (2.0 * ((2.0 * f * t) % 1.0) - 1.0)
+                let out = f * t + sec;
+                let saw = 2.0 * ((2.0 * out) % 1.0);
+                if out % 1.0 < 0.5 {
+                    v * (saw - 1.0)
                 } else {
-                    -v * (2.0 * ((2.0 * f * t) % 1.0) + 1.0)
+                    v * (1.0 - saw)
                 }
             }
         }
@@ -112,11 +115,10 @@ struct Oscillator {
 }
 
 impl Oscillator {
-    fn get_angular_freq(note: i32, rate: f32) -> f32 {
+    fn get_freq(note: i32, rate: f32) -> f32 {
         let pitch: f32 = (note as i32 - 69) as f32;
         let freq_hz = (2.0 as f32).powf(pitch/12.0) * 440.0;
-        let omega = 2.0 * f32::consts::PI / rate;
-        freq_hz * omega
+        freq_hz / rate
     }
 
     fn free_for(&self, t: i64, note: i32) -> bool {
@@ -149,10 +151,31 @@ impl Oscillator {
             self.start_t = start_t;
             self.end_t = i64::max_value();
 
-            let freq = Oscillator::get_angular_freq(note, self.rate);
+            let freq = Oscillator::get_freq(note, self.rate);
             let velocity = velocity;
-            self.primary = WaveType::Sine(freq, velocity);
-            self.secondary = Some(WaveType::Sine(freq * 2.0, 0.4));
+            self.primary = match (start_t / 100000) % 4 {
+                0 => {
+                    println!("Triangle");
+                    WaveType::Triangle(freq, velocity)
+                },
+                1 => {
+                    println!("Square");
+                    WaveType::Square(freq, velocity, 0.5)
+                },
+                2 => {
+                    println!("Sine");
+                    WaveType::Sine(freq, velocity)
+                },
+                3 => {
+                    println!("Sawtooth");
+                    WaveType::Sawtooth(freq, velocity)
+                },
+                _ => {
+                    println!("Sawtooth***");
+                    WaveType::Sawtooth(freq, velocity)
+                }
+            };
+            self.secondary = Some(WaveType::Sine(freq * 2.0, 0.8));
         }
     }
 
