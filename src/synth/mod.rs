@@ -1,5 +1,8 @@
 
+extern crate rand;
+
 use std::f32;
+use self::rand::random;
 
 use lv2::midi;
 use lv2_raw::midi as raw_midi;
@@ -24,11 +27,24 @@ pub enum SynthEventBody {
 }
 
 #[derive(Debug)]
+pub enum Waveform {
+    Sine,
+    Square,
+    Sawtooth,
+    Triangle,
+    Noise
+}
+
+#[derive(Debug)]
 pub enum SynthProperty {
     Frame(i64),
     Speed(f32),
+    Waveform(Waveform),
+    SecWave(Waveform, f32),
+    Envelope(Envelope)
 }
 
+#[derive(Debug)]
 struct Envelope {
     a: f32,
     d: f32,
@@ -71,7 +87,8 @@ enum WaveType {
     Sine(f32, f32),
     Square(f32, f32, f32),
     Sawtooth(f32, f32),
-    Triangle(f32, f32)
+    Triangle(f32, f32),
+    Noise(f32),
 }
 
 impl WaveType {
@@ -99,6 +116,9 @@ impl WaveType {
                 } else {
                     v * (1.0 - saw)
                 }
+            },
+            &WaveType::Noise(v) => {
+                v * random::<f32>()
             }
         }
     }
@@ -145,7 +165,8 @@ impl Oscillator {
         }
     }
 
-    fn config(&mut self, note: i32, velocity: f32, start_t: i64) {
+    // TODO Pass in the actual note type, and maybe envelope.
+    fn config(&mut self, form: Waveform, note: i32, velocity: f32, start_t: i64) {
         if start_t > self.end_t {
             self.note = note;
             self.start_t = start_t;
@@ -153,27 +174,22 @@ impl Oscillator {
 
             let freq = Oscillator::get_freq(note, self.rate);
             let velocity = velocity;
-            self.primary = match (start_t / 100000) % 4 {
-                0 => {
-                    println!("Triangle");
+            self.primary = match form {
+                Waveform::Triangle => {
                     WaveType::Triangle(freq, velocity)
                 },
-                1 => {
-                    println!("Square");
+                Waveform::Square => {
                     WaveType::Square(freq, velocity, 0.5)
                 },
-                2 => {
-                    println!("Sine");
+                Waveform::Sine => {
                     WaveType::Sine(freq, velocity)
                 },
-                3 => {
-                    println!("Sawtooth");
+                Waveform::Sawtooth => {
                     WaveType::Sawtooth(freq, velocity)
                 },
-                _ => {
-                    println!("Sawtooth***");
-                    WaveType::Sawtooth(freq, velocity)
-                }
+                Waveform::Noise => {
+                    WaveType::Noise(velocity)
+                },
             };
             self.secondary = Some(WaveType::Sine(freq * 2.0, 0.8));
         }
@@ -208,6 +224,16 @@ pub struct ToneIterator {
     osc: Vec<Oscillator>,
 }
 
+// TODO Add Filter and Filter ADSR
+// start at cutoff frequency fC,
+// A => go to fC + Filter Depth dp
+// D => go to fC + dp*Sustain
+// S => Stay
+// R => back to fC
+
+// TODO Also make the filter do Formants
+
+// TODO Also add reverb
 impl ToneIterator {
     pub fn new(rate: f32) -> ToneIterator {
         let mut vec = Vec::new();
@@ -232,7 +258,8 @@ impl ToneIterator {
                     &midi::MidiEvent::NoteOn { note_num, velocity } => {
                         // TODO Velocity as log
                         self.osc.iter_mut().find(|x| x.free_for(t, note_num as i32))
-                            .map(|mut x| x.config(note_num as i32,
+                            .map(|mut x| x.config(Waveform::Sine,
+                                                  note_num as i32,
                                                   velocity as f32 / 127.0,
                                                   t + data.time_frames));
                     },
