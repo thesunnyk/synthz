@@ -27,6 +27,7 @@ pub enum SynthEventBody {
 }
 
 #[derive(Debug)]
+#[derive(Clone)]
 pub enum Waveform {
     Sine,
     Square,
@@ -46,7 +47,7 @@ pub enum SynthProperty {
 
 #[derive(Debug)]
 #[derive(Clone)]
-struct Envelope {
+pub struct Envelope {
     a: f32,
     d: f32,
     s: f32,
@@ -54,12 +55,12 @@ struct Envelope {
 }
 
 impl Envelope {
-    fn new(a: i64, d: i64, s: f32, r: i64, rate: f32) -> Envelope {
+    fn new(a: f32, d: f32, s: f32, r: f32, rate: f32) -> Envelope {
         Envelope {
-            a: rate * a as f32 / 1000.0,
-            d: rate * d as f32 / 1000.0,
+            a: rate * a,
+            d: rate * d,
             s: s,
-            r: rate * r as f32 / 1000.0,
+            r: rate * r,
         }
     }
 
@@ -86,7 +87,8 @@ impl Envelope {
 }
 
 #[derive(Debug)]
-enum WaveType {
+#[derive(Clone)]
+pub enum WaveType {
     Sine(f32, f32),
     Square(f32, f32, f32),
     Sawtooth(f32, f32),
@@ -95,6 +97,26 @@ enum WaveType {
 }
 
 impl WaveType {
+
+    pub fn from_waveform(form: Waveform, freq: f32, velocity: f32) -> WaveType {
+        match form {
+            Waveform::Triangle => {
+                WaveType::Triangle(freq, velocity)
+            },
+            Waveform::Square => {
+                WaveType::Square(freq, velocity, 0.5)
+            },
+            Waveform::Sine => {
+                WaveType::Sine(freq, velocity)
+            },
+            Waveform::Sawtooth => {
+                WaveType::Sawtooth(freq, velocity)
+            },
+            Waveform::Noise => {
+                WaveType::Noise(velocity)
+            },
+        }
+    }
     fn oscillate(&self, t: f32, sec: f32) -> f32 {
         match self {
             &WaveType::Sine(f, v) => {
@@ -121,7 +143,7 @@ impl WaveType {
                 }
             },
             &WaveType::Noise(v) => {
-                v * random::<f32>()
+                v * (random::<f32>() * 2.0 - 1.0)
             }
         }
     }
@@ -179,7 +201,7 @@ impl Oscillator {
             rate: rate,
             start_t: i64::max_value(),
             end_t: 0,
-            envelope: Envelope::new(10, 13, 0.6, 100, rate),
+            envelope: Envelope::new(0.01, 0.013, 0.6, 0.1, rate),
             primary: WaveType::Sine(0.0, 0.0),
             secondary: None
         }
@@ -195,23 +217,7 @@ impl Oscillator {
 
             let freq = Oscillator::get_freq(note, self.rate);
             let velocity = velocity;
-            self.primary = match form {
-                Waveform::Triangle => {
-                    WaveType::Triangle(freq, velocity)
-                },
-                Waveform::Square => {
-                    WaveType::Square(freq, velocity, 0.5)
-                },
-                Waveform::Sine => {
-                    WaveType::Sine(freq, velocity)
-                },
-                Waveform::Sawtooth => {
-                    WaveType::Sawtooth(freq, velocity)
-                },
-                Waveform::Noise => {
-                    WaveType::Noise(velocity)
-                },
-            };
+            self.primary = WaveType::from_waveform(form, freq, velocity);
             self.secondary = secondary.as_ref().map(|x| x.secondary(freq));
         }
     }
@@ -243,6 +249,7 @@ pub struct ToneIterator {
     old_t: i64,
     rate: f32,
     osc: Vec<Oscillator>,
+    waveform: Waveform,
     envelope: Envelope,
     secondary: Option<WaveType>
 }
@@ -269,23 +276,39 @@ impl ToneIterator {
             old_t: 0,
             rate: rate,
             osc: vec,
-            envelope: Envelope::new(10, 13, 0.6, 100, rate),
+            waveform: Waveform::Sine,
+            envelope: Envelope::new(0.01, 0.013, 0.6, 0.1, rate),
             secondary: Some(WaveType::Sine(2.0, 0.6)),
         }
     }
 
+    pub fn new_env(&self, a: f32, d: f32, s: f32, r: f32) -> Envelope {
+        Envelope::new(a, d, s, r, self.rate)
+    }
+
     pub fn add_data(&mut self, events: Vec<SynthEvent>) {
         for data in events.as_slice() { match &data.body {
-            &SynthEventBody::SynthProperties(ref p) => { },
+            &SynthEventBody::SynthProperties(ref p) => {
+                for prop in p {
+                    match prop {
+                        &SynthProperty::Frame(f) => {}
+                        &SynthProperty::Speed(spd) => {}
+                        &SynthProperty::Waveform(ref wave) => { self.waveform = wave.clone() }
+                        &SynthProperty::SecWave(ref wave) => { self.secondary = Some(wave.clone()) }
+                        &SynthProperty::Envelope(ref env) => { self.envelope = env.clone() }
+                    }
+                }
+            },
             &SynthEventBody::MidiData(ref midi_ev) => {
                 let t = self.t;
                 match midi_ev {
                     &midi::MidiEvent::NoteOn { note_num, velocity } => {
                         let secondary = &self.secondary;
+                        let waveform = self.waveform.clone();
                         let envelope = self.envelope.clone();
                         // TODO Velocity as log
                         self.osc.iter_mut().find(|x| x.free_for(t, note_num as i32))
-                            .map(|mut x| x.config(Waveform::Sine,
+                            .map(|mut x| x.config(waveform,
                                                   note_num as i32,
                                                   velocity as f32 / 127.0,
                                                   secondary,

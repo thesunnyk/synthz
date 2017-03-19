@@ -21,6 +21,14 @@ use lv2::midi::*;
 
 const ControlInput: u32 = 0;
 const SynthOutput: u32 = 1;
+const Waveform: u32 = 2;
+const Attack: u32 = 3;
+const Decay: u32 = 4;
+const Sustain: u32 = 5;
+const Release: u32 = 6;
+const SecWaveform: u32 = 7;
+const SecFreqMul: u32 = 8;
+const SecDepth: u32 = 9;
 
 #[derive(Debug)]
 pub struct SamplerUris {
@@ -76,6 +84,14 @@ pub fn map_sampler_uris(map: *const LV2_URID_Map) -> SamplerUris {
 struct Amp {
     input: *const LV2_Atom,
     output: *mut f32,
+    waveform: *mut f32,
+    attack: *mut f32,
+    decay: *mut f32,
+    sustain: *mut f32,
+    release: *mut f32,
+    sec_waveform: *mut f32,
+    sec_freq_mul: *mut f32,
+    sec_depth: *mut f32,
     synth: synth::ToneIterator,
     samplerUris: SamplerUris,
 }
@@ -132,10 +148,17 @@ extern fn instantiate(descriptor: *const LV2_Descriptor,
 
     let mut urid_map = urid_extractor.urid_map.unwrap();
 
-
     let mut amp = Box::new(Amp {
         input: std::ptr::null_mut(),
         output: std::ptr::null_mut(),
+        waveform: std::ptr::null_mut(),
+        sec_waveform: std::ptr::null_mut(),
+        sec_freq_mul: std::ptr::null_mut(),
+        sec_depth: std::ptr::null_mut(),
+        attack: std::ptr::null_mut(),
+        decay: std::ptr::null_mut(),
+        sustain: std::ptr::null_mut(),
+        release: std::ptr::null_mut(),
         synth: synth::ToneIterator::new(rate as f32),
         samplerUris: map_sampler_uris(urid_map),
     });
@@ -145,16 +168,41 @@ extern fn instantiate(descriptor: *const LV2_Descriptor,
 }
 
 extern fn connect_port(instance: LV2_Handle, port: u32, data: *mut raw::c_void) {
-    let mut amp = instance as *mut Amp;
+    let mut pamp = instance as *mut Amp;
 
     unsafe {
+        let amp = &mut *pamp;
         match port {
             ControlInput => {
-                (*amp).input = data as *const LV2_Atom
+                amp.input = data as *const LV2_Atom
             },
             SynthOutput => {
-                (*amp).output = data as *mut f32
+                amp.output = data as *mut f32
             },
+            Waveform => {
+                amp.waveform = data as *mut f32
+            },
+            Attack => {
+                amp.attack = data as *mut f32
+            },
+            Decay => {
+                amp.decay = data as *mut f32
+            },
+            Sustain => {
+                amp.sustain = data as *mut f32
+            },
+            Release => {
+                amp.release = data as *mut f32
+            },
+            SecWaveform => {
+                amp.sec_waveform = data as *mut f32
+            },
+            SecFreqMul => {
+                amp.sec_freq_mul = data as *mut f32
+            },
+            SecDepth => {
+                amp.sec_depth = data as *mut f32
+            }
             _ => {println!("SynthZ Connect to unknown port")}
         }
     }
@@ -171,7 +219,6 @@ fn extract_sequence(seq: *const LV2_Atom_Sequence, s: &SamplerUris) -> Vec<synth
 
     let iter: AtomSequenceIter = AtomSequenceIter::new(seq);
 
-    // println!("Time unit URID: {}", iter.get_time_unit_urid());
     for event in iter {
         if event.data_type == s.midi_Event {
             ret.push(synth::SynthEvent::new(event.time_frames,
@@ -217,23 +264,52 @@ fn extract_object(obj: *const LV2_Atom_Object_Body,
     }
 }
 
+fn get_waveform(wave: f32) -> synth::Waveform {
+    let waveint = wave as i32;
+    match waveint {
+        0 => { synth::Waveform::Sine }
+        1 => { synth::Waveform::Square }
+        2 => { synth::Waveform::Sawtooth }
+        3 => { synth::Waveform::Triangle }
+        4 => { synth::Waveform::Noise }
+        _ => { panic!("Unexpected waveform"); }
+    }
+}
+
 extern fn run(instance: LV2_Handle, n_samples: u32) {
-    let mut amp: *mut Amp = instance as *mut Amp;
+    let mut pamp: *mut Amp = instance as *mut Amp;
     unsafe {
-        let pinput = (*amp).input;
+        let amp = &mut *pamp;
+        let pinput = amp.input;
 
         let input = &*pinput;
 
-        let uris = &(*amp).samplerUris;
+        let uris = &amp.samplerUris;
 
-        let synth = &mut (*amp).synth;
+        let synth = &mut amp.synth;
+
+        let waveform = get_waveform(*amp.waveform);
+
+        let envelope = synth.new_env(*amp.attack, *amp.decay, *amp.sustain, *amp.release);
+
+        let sec_waveform = get_waveform(*amp.sec_waveform);
+
+        let sec = synth::WaveType::from_waveform(sec_waveform, *amp.sec_freq_mul, *amp.sec_depth);
+
+        let control = vec!(
+                synth::SynthProperty::Waveform(waveform),
+                synth::SynthProperty::Envelope(envelope),
+                synth::SynthProperty::SecWave(sec)
+            );
+        let evs = vec!(synth::SynthEvent::new(0, synth::SynthEventBody::SynthProperties(control)));
+        synth.add_data(evs);
 
         if input.atom_type == uris.atom_Sequence {
             let midi_data = extract_sequence(pinput as *const LV2_Atom_Sequence, uris);
             synth.add_data(midi_data);
         }
 
-        let output: &mut [f32] = std::slice::from_raw_parts_mut((*amp).output, n_samples as usize);
+        let output: &mut [f32] = std::slice::from_raw_parts_mut(amp.output, n_samples as usize);
 
         for i in 0..output.len() {
             output[i as usize] = synth.next().unwrap();
