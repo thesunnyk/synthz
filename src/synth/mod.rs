@@ -1,6 +1,7 @@
 
 extern crate rand;
 
+use std::collections::VecDeque;
 use std::f32;
 use self::rand::random;
 
@@ -178,6 +179,7 @@ struct Oscillator {
     primary: WaveType,
     secondary: Option<WaveType>,
     envelope: Envelope,
+    filter: Filter
 }
 
 impl Oscillator {
@@ -202,6 +204,7 @@ impl Oscillator {
             start_t: i64::max_value(),
             end_t: 0,
             envelope: Envelope::new(0.01, 0.013, 0.6, 0.1, rate),
+            filter: Filter::fromCfg(lpf(450.0, rate)),
             primary: WaveType::Sine(0.0, 0.0),
             secondary: None
         }
@@ -232,12 +235,12 @@ impl Oscillator {
         }
     }
 
-    fn oscillate(&self, t: i64) -> f32 {
+    fn oscillate(&mut self, t: i64) -> f32 {
         if self.start_t < t {
             let env = self.envelope.envelope(self.end_t - self.start_t, t - self.start_t);
             let secwave = self.secondary.as_ref().map_or(0.0, |s| s.oscillate(t as f32, 0.0));
 
-            env * self.primary.oscillate(t as f32, secwave)
+            self.filter.filter(env * self.primary.oscillate(t as f32, secwave))
         } else {
             0.0
         }
@@ -252,6 +255,54 @@ pub struct ToneIterator {
     waveform: Waveform,
     envelope: Envelope,
     secondary: Option<WaveType>
+}
+
+pub struct FilterConfig {
+    x_coeff: Vec<f32>,
+    y_coeff: Vec<f32>
+}
+
+fn lpf(freq: f32, rate: f32) -> FilterConfig {
+    FilterConfig {
+        x_coeff: vec![1.0],
+        y_coeff: vec![f32::exp(-(freq * 2.0 * f32::consts::PI)/rate)]
+    }
+}
+
+pub struct Filter {
+    config: FilterConfig,
+    x_val: VecDeque<f32>,
+    y_val: VecDeque<f32>
+}
+
+impl Filter {
+    pub fn fromCfg(f: FilterConfig) -> Filter {
+        let mut xv = VecDeque::with_capacity(f.x_coeff.len());
+        for i in 0..f.x_coeff.len() - 1 {
+            xv.push_back(0.0);
+        }
+        let mut yv = VecDeque::with_capacity(f.y_coeff.len());
+        for i in 0..f.y_coeff.len() {
+            yv.push_back(0.0);
+        }
+        Filter {
+            config: f,
+            x_val: xv,
+            y_val: yv
+        }
+    }
+
+    pub fn filter(&mut self, x: f32) -> f32 {
+        let mut y = 0;
+        self.x_val.push_back(x);
+        let y = self.x_val.iter().zip(&self.config.x_coeff).map(|(xi, xc)| xi * xc).fold(0.0, |a, b| a + b)
+            + self.y_val.iter().zip(&self.config.y_coeff).map(|(xi, xc)| xi * xc).fold(0.0, |a, b| a + b);
+
+        self.x_val.pop_front();
+        self.y_val.push_back(y);
+        self.y_val.pop_front();
+        y
+    }
 }
 
 // TODO Add Filter and Filter ADSR
@@ -337,7 +388,10 @@ impl Iterator for ToneIterator {
     fn next(&mut self) -> Option<f32> {
         self.t = self.t + 1;
 
-        let mut result = self.osc.iter().fold(0.0, |x, y| x + y.oscillate(self.t));
+        let mut result = 0.0;
+        for osc in self.osc.iter_mut() {
+            result = result + osc.oscillate(self.t);
+        }
 
         Some(result)
     }
