@@ -29,6 +29,8 @@ const Release: u32 = 6;
 const SecWaveform: u32 = 7;
 const SecFreqMul: u32 = 8;
 const SecDepth: u32 = 9;
+const FilterFreq: u32 = 10;
+const FilterOn: u32 = 11;
 
 #[derive(Debug)]
 pub struct SamplerUris {
@@ -92,6 +94,8 @@ struct Amp {
     sec_waveform: *mut f32,
     sec_freq_mul: *mut f32,
     sec_depth: *mut f32,
+    filter_freq: *mut f32,
+    filter_on: *mut f32,
     synth: synth::ToneIterator,
     samplerUris: SamplerUris,
 }
@@ -159,6 +163,8 @@ extern fn instantiate(descriptor: *const LV2_Descriptor,
         decay: std::ptr::null_mut(),
         sustain: std::ptr::null_mut(),
         release: std::ptr::null_mut(),
+        filter_freq: std::ptr::null_mut(),
+        filter_on: std::ptr::null_mut(),
         synth: synth::ToneIterator::new(rate as f32),
         samplerUris: map_sampler_uris(urid_map),
     });
@@ -202,6 +208,12 @@ extern fn connect_port(instance: LV2_Handle, port: u32, data: *mut raw::c_void) 
             },
             SecDepth => {
                 amp.sec_depth = data as *mut f32
+            }
+            FilterFreq => {
+                amp.filter_freq = data as *mut f32
+            }
+            FilterOn => {
+                amp.filter_on = data as *mut f32
             }
             _ => {println!("SynthZ Connect to unknown port")}
         }
@@ -296,10 +308,16 @@ extern fn run(instance: LV2_Handle, n_samples: u32) {
 
         let sec = synth::WaveType::from_waveform(sec_waveform, *amp.sec_freq_mul, *amp.sec_depth);
 
+        let filter_freq = *amp.filter_freq;
+
+        let filter_on = *amp.filter_on > 0.5;
+
         let control = vec!(
                 synth::SynthProperty::Waveform(waveform),
                 synth::SynthProperty::Envelope(envelope),
-                synth::SynthProperty::SecWave(sec)
+                synth::SynthProperty::SecWave(sec),
+                synth::SynthProperty::FilterFreq(filter_freq),
+                synth::SynthProperty::FilterOn(filter_on)
             );
         let evs = vec!(synth::SynthEvent::new(0, synth::SynthEventBody::SynthProperties(control)));
         synth.add_data(evs);

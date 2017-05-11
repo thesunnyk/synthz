@@ -99,5 +99,23 @@
         lv2:default 0.0 ;
         lv2:minimum 0.0 ;
         lv2:maximum 2.0 ;
+	] , [
+		a lv2:InputPort ,
+			lv2:ControlPort ;
+		lv2:index 10 ;
+		lv2:symbol "filter_freq" ;
+		lv2:name "Filter Frequency" ;
+        lv2:default 0.0 ;
+        lv2:minimum 0.0 ;
+        lv2:maximum 22050.0 ;
+	] , [
+		a lv2:InputPort ,
+			lv2:ControlPort ;
+		lv2:index 11 ;
+		lv2:symbol "filter_on" ;
+		lv2:name "Filter On/Off" ;
+        lv2:default 0.0 ;
+        lv2:minimum 0.0 ;
+        lv2:maximum 1.0 ;
 	] .
 

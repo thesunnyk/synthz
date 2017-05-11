@@ -43,7 +43,9 @@ pub enum SynthProperty {
     Speed(f32),
     Waveform(Waveform),
     SecWave(WaveType),
-    Envelope(Envelope)
+    Envelope(Envelope),
+    FilterFreq(f32),
+    FilterOn(bool)
 }
 
 #[derive(Debug)]
@@ -179,7 +181,7 @@ struct Oscillator {
     primary: WaveType,
     secondary: Option<WaveType>,
     envelope: Envelope,
-    filter: Filter
+    filter: Option<Filter>
 }
 
 impl Oscillator {
@@ -204,19 +206,25 @@ impl Oscillator {
             start_t: i64::max_value(),
             end_t: 0,
             envelope: Envelope::new(0.01, 0.013, 0.6, 0.1, rate),
-            filter: Filter::fromCfg(lpf(450.0, rate)),
+            filter: Some(Filter::fromCfg(lpf(450.0, rate))),
             primary: WaveType::Sine(0.0, 0.0),
             secondary: None
         }
     }
 
     fn config(&mut self, form: Waveform, note: i32, velocity: f32,
-              secondary: &Option<WaveType>, env: Envelope, start_t: i64) {
+              secondary: &Option<WaveType>, env: Envelope, start_t: i64, filter_freq: f32, filter_on: bool) {
         if start_t > self.end_t {
             self.note = note;
             self.start_t = start_t;
             self.end_t = i64::max_value();
             self.envelope = env.clone();
+
+            self.filter = if filter_on {
+                Some(Filter::fromCfg(lpf(filter_freq, self.rate)))
+            } else {
+                None
+            };
 
             let freq = Oscillator::get_freq(note, self.rate);
             let velocity = velocity;
@@ -240,21 +248,13 @@ impl Oscillator {
             let env = self.envelope.envelope(self.end_t - self.start_t, t - self.start_t);
             let secwave = self.secondary.as_ref().map_or(0.0, |s| s.oscillate(t as f32, 0.0));
 
-            self.filter.filter(env * self.primary.oscillate(t as f32, secwave))
+            let osc = env * self.primary.oscillate(t as f32, secwave);
+
+            self.filter.as_mut().map(|mut f| f.filter(osc)).unwrap_or(osc)
         } else {
             0.0
         }
     }
-}
-
-pub struct ToneIterator {
-    t: i64,
-    old_t: i64,
-    rate: f32,
-    osc: Vec<Oscillator>,
-    waveform: Waveform,
-    envelope: Envelope,
-    secondary: Option<WaveType>
 }
 
 pub struct FilterConfig {
@@ -263,9 +263,10 @@ pub struct FilterConfig {
 }
 
 fn lpf(freq: f32, rate: f32) -> FilterConfig {
+    let eat = f32::exp(-(freq * 2.0 * f32::consts::PI)/rate);
     FilterConfig {
-        x_coeff: vec![1.0],
-        y_coeff: vec![f32::exp(-(freq * 2.0 * f32::consts::PI)/rate)]
+        x_coeff: vec![1.0 - eat, 0.0],
+        y_coeff: vec![eat]
     }
 }
 
@@ -315,6 +316,18 @@ impl Filter {
 // TODO Also make the filter do Formants
 
 // TODO Also add reverb
+
+pub struct ToneIterator {
+    t: i64,
+    rate: f32,
+    filter_freq: f32,
+    filter_on: bool,
+    osc: Vec<Oscillator>,
+    waveform: Waveform,
+    envelope: Envelope,
+    secondary: Option<WaveType>
+}
+
 impl ToneIterator {
     pub fn new(rate: f32) -> ToneIterator {
         let mut vec = Vec::new();
@@ -324,8 +337,9 @@ impl ToneIterator {
 
         ToneIterator {
             t: 0,
-            old_t: 0,
             rate: rate,
+            filter_freq: 22050.0,
+            filter_on: true,
             osc: vec,
             waveform: Waveform::Sine,
             envelope: Envelope::new(0.01, 0.013, 0.6, 0.1, rate),
@@ -346,6 +360,8 @@ impl ToneIterator {
                         &SynthProperty::Speed(spd) => {}
                         &SynthProperty::Waveform(ref wave) => { self.waveform = wave.clone() }
                         &SynthProperty::SecWave(ref wave) => { self.secondary = Some(wave.clone()) }
+                        &SynthProperty::FilterFreq(freq) => { self.filter_freq = freq }
+                        &SynthProperty::FilterOn(ison) => { self.filter_on = ison }
                         &SynthProperty::Envelope(ref env) => { self.envelope = env.clone() }
                     }
                 }
@@ -357,6 +373,8 @@ impl ToneIterator {
                         let secondary = &self.secondary;
                         let waveform = self.waveform.clone();
                         let envelope = self.envelope.clone();
+                        let filter_freq = self.filter_freq;
+                        let filter_on = self.filter_on;
                         // TODO Velocity as log
                         self.osc.iter_mut().find(|x| x.free_for(t, note_num as i32))
                             .map(|mut x| x.config(waveform,
@@ -364,7 +382,9 @@ impl ToneIterator {
                                                   velocity as f32 / 127.0,
                                                   secondary,
                                                   envelope,
-                                                  t + data.time_frames));
+                                                  t + data.time_frames,
+                                                  filter_freq,
+                                                  filter_on));
                     },
                     &midi::MidiEvent::NoteOff { note_num, velocity } => {
                         self.osc.iter_mut().find(|x| x.is_note(note_num as i32))
