@@ -206,7 +206,7 @@ impl Oscillator {
             start_t: i64::max_value(),
             end_t: 0,
             envelope: Envelope::new(0.01, 0.013, 0.6, 0.1, rate),
-            filter: Some(Filter::fromCfg(lpf(450.0, rate))),
+            filter: Some(Filter::fromCfg(vec![lpf(450.0, rate)])),
             primary: WaveType::Sine(0.0, 0.0),
             secondary: None
         }
@@ -221,7 +221,7 @@ impl Oscillator {
             self.envelope = env.clone();
 
             self.filter = if filter_on {
-                Some(Filter::fromCfg(lpf(filter_freq, self.rate)))
+                Some(Filter::fromCfg(vec![lpf(filter_freq, self.rate)]))
             } else {
                 None
             };
@@ -257,52 +257,73 @@ impl Oscillator {
     }
 }
 
-pub struct FilterConfig {
-    x_coeff: Vec<f32>,
-    y_coeff: Vec<f32>
+pub struct BiQuadCoeffs {
+    a1: f32,
+    a2: f32,
+    b0: f32,
+    b1: f32,
+    b2: f32
 }
 
-fn lpf(freq: f32, rate: f32) -> FilterConfig {
-    let eat = f32::exp(-(freq * 2.0 * f32::consts::PI)/rate);
-    FilterConfig {
-        x_coeff: vec![1.0 - eat, 0.0],
-        y_coeff: vec![eat]
+impl BiQuadCoeffs {
+    pub fn new(b0: f32, b1: f32, b2: f32, a1: f32, a2: f32) -> BiQuadCoeffs {
+        BiQuadCoeffs {
+            b0: b0,
+            b1: b1,
+            b2: b2,
+            a1: a1,
+            a2: a2
+        }
     }
 }
 
-pub struct Filter {
-    config: FilterConfig,
-    x_val: VecDeque<f32>,
-    y_val: VecDeque<f32>
+pub struct BiQuad {
+    coeffs: BiQuadCoeffs,
+    wn1: f32,
+    wn2: f32
 }
 
-impl Filter {
-    pub fn fromCfg(f: FilterConfig) -> Filter {
-        let mut xv = VecDeque::with_capacity(f.x_coeff.len());
-        for i in 0..f.x_coeff.len() - 1 {
-            xv.push_back(0.0);
-        }
-        let mut yv = VecDeque::with_capacity(f.y_coeff.len());
-        for i in 0..f.y_coeff.len() {
-            yv.push_back(0.0);
-        }
-        Filter {
-            config: f,
-            x_val: xv,
-            y_val: yv
+impl BiQuad {
+    pub fn new(coeffs: BiQuadCoeffs) -> BiQuad {
+        BiQuad {
+            coeffs: coeffs,
+            wn1: 0.0,
+            wn2: 0.0
         }
     }
 
     pub fn filter(&mut self, x: f32) -> f32 {
-        let mut y = 0;
-        self.x_val.push_back(x);
-        let y = self.x_val.iter().zip(&self.config.x_coeff).map(|(xi, xc)| xi * xc).fold(0.0, |a, b| a + b)
-            + self.y_val.iter().zip(&self.config.y_coeff).map(|(xi, xc)| xi * xc).fold(0.0, |a, b| a + b);
-
-        self.x_val.pop_front();
-        self.y_val.push_back(y);
-        self.y_val.pop_front();
+        let wn = x - self.coeffs.a1 * self.wn1 - self.coeffs.a2 * self.wn2;
+        let y = self.coeffs.b0 * wn + self.coeffs.b1 * self.wn1 + self.coeffs.b2 * self.wn2;
+        // shift delays
+        self.wn2 = self.wn1;
+        self.wn1 = wn;
         y
+    }
+}
+
+fn lpf(freq: f32, rate: f32) -> BiQuadCoeffs {
+    let eat = f32::exp(-(freq * 2.0 * f32::consts::PI)/rate);
+    BiQuadCoeffs::new(1.0 - eat, 0.0, 0.0, -eat, 0.0)
+}
+
+pub struct Filter {
+    quads: Vec<BiQuad>
+}
+
+impl Filter {
+    pub fn fromCfg(quads: Vec<BiQuadCoeffs>) -> Filter {
+        let mut xv = Vec::with_capacity(quads.len());
+        for i in quads {
+            xv.push(BiQuad::new(i));
+        }
+        Filter {
+            quads: xv
+        }
+    }
+
+    pub fn filter(&mut self, x: f32) -> f32 {
+        self.quads.iter_mut().fold(x, |yn, quad| quad.filter(yn))
     }
 }
 
