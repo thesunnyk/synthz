@@ -208,7 +208,7 @@ impl Oscillator {
             start_t: i64::max_value(),
             end_t: 0,
             envelope: Envelope::new(0.01, 0.013, 0.6, 0.1, rate),
-            filter: Some(filter::Filter::fromCfg(vec![filter::lpf(450.0, rate)])),
+            filter: Some(filter::Filter::fromCfg(filter::butterworth_lpf(2, 450.0, rate as u32))),
             primary: WaveType::Sine(0.0, 0.0),
             secondary: None
         }
@@ -223,7 +223,7 @@ impl Oscillator {
             self.envelope = env.clone();
 
             self.filter = if filter_on {
-                Some(filter::Filter::fromCfg(vec![filter::lpf(filter_freq, self.rate)]))
+                Some(filter::Filter::fromCfg(filter::butterworth_lpf(2, filter_freq, self.rate as u32)))
             } else {
                 None
             };
