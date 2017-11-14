@@ -102,10 +102,10 @@ fn analog_coeffs(n: u32) -> Vec<AnalogBiQuadCoeffs> {
     for k in 0..n / 2 {
         let frac = (2.0 * (k + 1) as f32 + n as f32 - 1.0) * f32::consts::PI / (2.0 * n as f32);
         let mv = -2.0 * f32::cos(frac) + 1.0;
-        coeffs.push(AnalogBiQuadCoeffs::new(1.0 / f32::sqrt(2.0), 0.0, 0.0, 1.0, mv, 1.0));
+        coeffs.push(AnalogBiQuadCoeffs::new(0.0, 0.0, 1.0 / f32::sqrt(2.0), 1.0, mv, 1.0));
     }
     if n % 2 > 0 {
-        coeffs.push(AnalogBiQuadCoeffs::new(1.0 / f32::sqrt(2.0), 0.0, 0.0, 1.0, 1.0, 0.0));
+        coeffs.push(AnalogBiQuadCoeffs::new(0.0, 0.0, 1.0 / f32::sqrt(2.0), 0.0, 1.0, 1.0));
     }
     coeffs
 }
