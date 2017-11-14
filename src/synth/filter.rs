@@ -101,7 +101,7 @@ fn analog_coeffs(n: u32) -> Vec<AnalogBiQuadCoeffs> {
     let mut coeffs = Vec::<AnalogBiQuadCoeffs>::with_capacity(((n + 1) / 2) as usize);
     for k in 0..n / 2 {
         let frac = (2.0 * (k + 1) as f32 + n as f32 - 1.0) * f32::consts::PI / (2.0 * n as f32);
-        let mv = -2.0 * f32::cos(frac) + 1.0;
+        let mv = -2.0 * f32::cos(frac);
         coeffs.push(AnalogBiQuadCoeffs::new(0.0, 0.0, 1.0 / f32::sqrt(2.0), 1.0, mv, 1.0));
     }
     if n % 2 > 0 {
@@ -128,7 +128,7 @@ pub fn butterworth_lpf(order: u32, cutoff: f32, sampling_freq: f32) -> Vec<BiQua
     println!("Synth Coeffs: {:?}", coeffs);
 
     let warp = 1.0 / f32::tan(cutoff / (2.0 * sampling_freq));
-    println!("Synth Warp: {:?}", warp);
+    println!("Synth cutoff {:?} freq: {:?} warp {:?}", cutoff, sampling_freq, warp);
 
     let biquads = coeffs.iter().map(|c| digitise_biquad(c, warp)).collect();
     println!("Synth Biquads: {:?}", biquads);
