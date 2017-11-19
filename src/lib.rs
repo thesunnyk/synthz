@@ -276,14 +276,14 @@ fn extract_object(obj: *const LV2_Atom_Object_Body,
     }
 }
 
-fn get_waveform(wave: f32) -> synth::Waveform {
+fn get_waveform(wave: f32) -> synth::oscillator::Waveform {
     let waveint = wave as i32;
     match waveint {
-        0 => { synth::Waveform::Sine }
-        1 => { synth::Waveform::Square }
-        2 => { synth::Waveform::Sawtooth }
-        3 => { synth::Waveform::Triangle }
-        4 => { synth::Waveform::Noise }
+        0 => { synth::oscillator::Waveform::Sine }
+        1 => { synth::oscillator::Waveform::Square }
+        2 => { synth::oscillator::Waveform::Sawtooth }
+        3 => { synth::oscillator::Waveform::Triangle }
+        4 => { synth::oscillator::Waveform::Noise }
         _ => { panic!("Unexpected waveform"); }
     }
 }
@@ -306,7 +306,7 @@ extern fn run(instance: LV2_Handle, n_samples: u32) {
 
         let sec_waveform = get_waveform(*amp.sec_waveform);
 
-        let sec = synth::WaveType::from_waveform(sec_waveform, *amp.sec_freq_mul, *amp.sec_depth);
+        let sec = synth::oscillator::WaveType::from_waveform(sec_waveform, *amp.sec_freq_mul);
 
         let filter_freq = *amp.filter_freq;
 
