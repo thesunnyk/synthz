@@ -3,6 +3,8 @@ extern crate rand;
 use self::rand::random;
 use std::f32;
 
+use synth::module;
+
 #[derive(Debug)]
 #[derive(Clone)]
 pub enum Waveform {
@@ -13,56 +15,25 @@ pub enum Waveform {
     Noise
 }
 
+impl Waveform {
 
-#[derive(Debug)]
-#[derive(Clone)]
-pub enum WaveType {
-    Sine(f32),
-    Square(f32, f32),
-    Sawtooth(f32),
-    Triangle(f32),
-    Noise,
-}
-
-impl WaveType {
-
-    pub fn from_waveform(form: Waveform, freq: f32) -> WaveType {
-        match form {
-            Waveform::Triangle => {
-                WaveType::Triangle(freq)
-            },
-            Waveform::Square => {
-                // TODO Wire up square wave width
-                WaveType::Square(freq, 0.5)
-            },
-            Waveform::Sine => {
-                WaveType::Sine(freq)
-            },
-            Waveform::Sawtooth => {
-                WaveType::Sawtooth(freq)
-            },
-            Waveform::Noise => {
-                WaveType::Noise
-            },
-        }
-    }
-    fn oscillate(&self, t: f32) -> f32 {
+    fn oscillate(&self, t: f32, f: f32, d: f32) -> f32 {
         match self {
-            &WaveType::Sine(f) => {
+            &Waveform::Sine => {
                 let omega = 2.0 * f32::consts::PI;
                 f32::sin(f * t * omega)
             },
-            &WaveType::Square(f, d) => {
+            &Waveform::Square => {
                 if (f * t) % 1.0 < d {
                     0.5
                 } else {
                     -0.5
                 }
             },
-            &WaveType::Sawtooth(f) => {
+            &Waveform::Sawtooth => {
                 2.0 * ((f * t) % 1.0) - 1.0
             },
-            &WaveType::Triangle(f) => {
+            &Waveform::Triangle => {
                 let out = f * t;
                 let saw = 2.0 * ((2.0 * out) % 1.0);
                 if out % 1.0 < 0.5 {
@@ -71,16 +42,42 @@ impl WaveType {
                     1.0 - saw
                 }
             },
-            &WaveType::Noise => {
+            &Waveform::Noise => {
                 random::<f32>() * 2.0 - 1.0
             }
         }
     }
 }
 
+struct DataIn {
+    v: Option<Vec<f32>>,
+    default: f32
+}
+
+impl DataIn {
+    fn new(default: f32) -> DataIn {
+        DataIn { v: None, default: default }
+    }
+
+    // TODO actually return the iterator
+    fn next(&mut self) -> f32 {
+        self.v.as_mut().map(|v| *v.iter().next().expect("expected more data")).unwrap_or(self.default)
+    }
+
+}
+
+impl module::Input for DataIn {
+    fn feed(&mut self, v: Vec<f32>) {
+        self.v = Some(v);
+    }
+}
+
 pub struct Oscillator {
+    w: f32,
     rate: f32,
-    primary: WaveType,
+    primary: Waveform,
+    freq_in: DataIn,
+    duty_cycle_in: DataIn,
 }
 
 impl Oscillator {
@@ -91,20 +88,53 @@ impl Oscillator {
     }
 
     pub fn new(rate: f32) -> Oscillator {
-        Oscillator {
-            rate: rate,
-            primary: WaveType::Sine(0.0),
-        }
+        let ret = Oscillator {
+            w: 0.0,
+            rate,
+            primary: Waveform::Sine,
+            freq_in: DataIn::new(0.0),
+            duty_cycle_in: DataIn::new(0.5),
+        };
+        ret
     }
 
-    pub fn config(&mut self, form: Waveform, pitch: f32) {
-        let freq = Oscillator::get_freq(pitch, self.rate);
-        self.primary = WaveType::from_waveform(form, freq);
-    }
-
-    pub fn oscillate(&mut self, t: i64) -> f32 {
+    pub fn oscillate(&mut self) -> f32 {
+        let freq = Oscillator::get_freq(self.freq_in.next(), self.rate);
+        let res = self.primary.oscillate(self.w, freq, self.duty_cycle_in.next());
         // TODO Use omega not t.
-        self.primary.oscillate(t as f32)
+        self.w = self.w + 1.0;
+        res
     }
+}
+
+impl module::Output for Oscillator {
+    fn extract(&mut self, len: usize) -> Vec<f32> {
+        let mut ret = Vec::<f32>::with_capacity(len);
+        for i in 0..len {
+            ret.push(self.oscillate());
+        }
+        ret
+    }
+}
+
+impl module::Module for Oscillator {
+
+    fn inputs(&mut self) -> Vec<&mut module::Input> {
+        vec!(&mut self.freq_in, &mut self.duty_cycle_in)
+    }
+
+    fn outputs(&mut self) -> Vec<&mut module::Output> {
+        vec!(self)
+    }
+}
+
+
+impl Iterator for Oscillator {
+    type Item = f32;
+
+    fn next(&mut self) -> Option<f32> {
+        Some(self.oscillate())
+    }
+
 }
 

@@ -5,6 +5,7 @@ use lv2::midi;
 use lv2_raw::midi as raw_midi;
 
 mod filter;
+mod module;
 pub mod oscillator;
 
 pub struct SynthEvent {
@@ -30,8 +31,7 @@ pub enum SynthEventBody {
 pub enum SynthProperty {
     Frame(i64),
     Speed(f32),
-    Waveform(oscillator::Waveform),
-    SecWave(oscillator::WaveType),
+    Waveform(f32),
     Envelope(Envelope),
     FilterFreq(f32),
     FilterOn(bool)
@@ -84,9 +84,8 @@ pub struct ToneIterator {
     filter_freq: f32,
     filter_on: bool,
     osc: oscillator::Oscillator,
-    waveform: oscillator::Waveform,
+    waveform: f32,
     envelope: Envelope,
-    secondary: Option<oscillator::WaveType>
 }
 
 impl ToneIterator {
@@ -97,9 +96,8 @@ impl ToneIterator {
             filter_freq: 22050.0,
             filter_on: true,
             osc: oscillator::Oscillator::new(rate),
-            waveform: oscillator::Waveform::Sine,
+            waveform: 0.0,
             envelope: Envelope::new(0.01, 0.013, 0.6, 0.1, rate),
-            secondary: Some(oscillator::WaveType::Sine(2.0)),
         }
     }
 
@@ -114,8 +112,7 @@ impl ToneIterator {
                     match prop {
                         &SynthProperty::Frame(f) => {}
                         &SynthProperty::Speed(spd) => {}
-                        &SynthProperty::Waveform(ref wave) => { self.waveform = wave.clone() }
-                        &SynthProperty::SecWave(ref wave) => { self.secondary = Some(wave.clone()) }
+                        &SynthProperty::Waveform(wave) => { self.waveform = wave }
                         &SynthProperty::FilterFreq(freq) => { self.filter_freq = freq }
                         &SynthProperty::FilterOn(ison) => { self.filter_on = ison }
                         &SynthProperty::Envelope(ref env) => { self.envelope = env.clone() }
@@ -126,7 +123,6 @@ impl ToneIterator {
                 let t = self.t;
                 match midi_ev {
                     &midi::MidiEvent::NoteOn { note_num, velocity } => {
-                        let secondary = &self.secondary;
                         let waveform = self.waveform.clone();
                         let envelope = self.envelope.clone();
                         let filter_freq = self.filter_freq;
@@ -134,7 +130,6 @@ impl ToneIterator {
                         // TODO Wire up envelope, FM and filter
                         let pitch = (note_num as i32 - 69) as f32 / 12.0;
                         // TODO Velocity as log
-                        self.osc.config(waveform, pitch);
                     },
                     &midi::MidiEvent::NoteOff { note_num, velocity } => {
                         // TODO End Note
@@ -155,9 +150,7 @@ impl Iterator for ToneIterator {
     type Item = f32;
 
     fn next(&mut self) -> Option<f32> {
-        self.t = self.t + 1;
-
-        Some(self.osc.oscillate(self.t))
+        Some(self.osc.oscillate())
     }
 }
 

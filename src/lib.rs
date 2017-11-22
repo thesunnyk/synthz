@@ -276,18 +276,6 @@ fn extract_object(obj: *const LV2_Atom_Object_Body,
     }
 }
 
-fn get_waveform(wave: f32) -> synth::oscillator::Waveform {
-    let waveint = wave as i32;
-    match waveint {
-        0 => { synth::oscillator::Waveform::Sine }
-        1 => { synth::oscillator::Waveform::Square }
-        2 => { synth::oscillator::Waveform::Sawtooth }
-        3 => { synth::oscillator::Waveform::Triangle }
-        4 => { synth::oscillator::Waveform::Noise }
-        _ => { panic!("Unexpected waveform"); }
-    }
-}
-
 extern fn run(instance: LV2_Handle, n_samples: u32) {
     let mut pamp: *mut Amp = instance as *mut Amp;
     unsafe {
@@ -300,13 +288,9 @@ extern fn run(instance: LV2_Handle, n_samples: u32) {
 
         let synth = &mut amp.synth;
 
-        let waveform = get_waveform(*amp.waveform);
+        let waveform = *amp.waveform;
 
         let envelope = synth.new_env(*amp.attack, *amp.decay, *amp.sustain, *amp.release);
-
-        let sec_waveform = get_waveform(*amp.sec_waveform);
-
-        let sec = synth::oscillator::WaveType::from_waveform(sec_waveform, *amp.sec_freq_mul);
 
         let filter_freq = *amp.filter_freq;
 
@@ -315,7 +299,6 @@ extern fn run(instance: LV2_Handle, n_samples: u32) {
         let control = vec!(
                 synth::SynthProperty::Waveform(waveform),
                 synth::SynthProperty::Envelope(envelope),
-                synth::SynthProperty::SecWave(sec),
                 synth::SynthProperty::FilterFreq(filter_freq),
                 synth::SynthProperty::FilterOn(filter_on)
             );
