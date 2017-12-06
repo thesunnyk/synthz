@@ -39,9 +39,13 @@ impl Rack {
 
     pub fn feed_all(&mut self, len: usize) {
         for c in &self.connections {
+            let out = {
+                let mut mod_out = self.modules[c.mod_out].as_mut();
+                mod_out.outputs()[c.output].extract(len)
+            };
+
             let mut mod_in = self.modules[c.mod_in].as_mut();
-            let mut mod_out = self.modules[c.mod_out].as_mut();
-            mod_in.inputs()[c.input].feed(mod_out.outputs()[c.output].extract(len))
+            mod_in.inputs()[c.input].feed(out)
         }
     }
 }
