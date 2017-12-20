@@ -2,6 +2,8 @@
 extern crate rand;
 use self::rand::random;
 use std::f32;
+use std::iter::Cycle;
+use std::slice::Iter;
 
 use synth::module;
 
@@ -58,18 +60,6 @@ impl DataIn {
     fn new(default: f32) -> DataIn {
         DataIn { v: None, default: default }
     }
-
-    // TODO actually return the iterator
-    fn next(&mut self) -> f32 {
-        self.v.as_mut().map(|v| *v.iter().next().expect("expected more data")).unwrap_or(self.default)
-    }
-
-}
-
-impl module::Input for DataIn {
-    fn feed(&mut self, v: Vec<f32>) {
-        self.v = Some(v);
-    }
 }
 
 pub struct Oscillator {
@@ -98,43 +88,38 @@ impl Oscillator {
         ret
     }
 
-    pub fn oscillate(&mut self) -> f32 {
-        let freq = Oscillator::get_freq(self.freq_in.next(), self.rate);
-        let res = self.primary.oscillate(self.w, freq, self.duty_cycle_in.next());
+    pub fn oscillate(&mut self, freq_in: f32, duty_cycle_in: f32) -> f32 {
+        let freq = Oscillator::get_freq(freq_in, self.rate);
+        let res = self.primary.oscillate(self.w, freq, duty_cycle_in);
         // TODO Use omega not t.
         self.w = self.w + 1.0;
         res
     }
 }
 
-impl module::Output for Oscillator {
-    fn extract(&mut self, len: usize) -> Vec<f32> {
+impl module::Module for Oscillator {
+    fn feed(&mut self, offset: usize, v: Vec<f32>) {
+        assert!(offset == 0);
+        match offset {
+            0 => self.freq_in.v = Some(v),
+            1 => self.duty_cycle_in.v = Some(v),
+            _ => panic!("Invalid input")
+        }
+    }
+
+    fn extract(&mut self, offset: usize, len: usize) -> Vec<f32> {
         let mut ret = Vec::<f32>::with_capacity(len);
+        let freq_in = self.freq_in.v.take();
+        let v = freq_in.unwrap_or(vec![self.freq_in.default]);
+        let mut it = v.iter();
+
         for i in 0..len {
-            ret.push(self.oscillate());
+            // TODO duty_cycle_in.iter();
+            let freq: f32 = *it.next().expect("Expected more data");
+            ret.push(self.oscillate(freq, 0.0));
         }
         ret
     }
 }
 
-impl module::Module for Oscillator {
-
-    fn inputs(&mut self) -> Vec<&mut module::Input> {
-        vec!(&mut self.freq_in, &mut self.duty_cycle_in)
-    }
-
-    fn outputs(&mut self) -> Vec<&mut module::Output> {
-        vec!(self)
-    }
-}
-
-
-impl Iterator for Oscillator {
-    type Item = f32;
-
-    fn next(&mut self) -> Option<f32> {
-        Some(self.oscillate())
-    }
-
-}
 

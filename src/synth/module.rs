@@ -1,16 +1,8 @@
 
 
 pub trait Module {
-    fn inputs(&mut self) -> Vec<&mut Input>;
-    fn outputs(&mut self) -> Vec<&mut Output>;
-}
-
-pub trait Input {
-    fn feed(&mut self, v: Vec<f32>);
-}
-
-pub trait Output {
-    fn extract(&mut self, len: usize) -> Vec<f32>;
+    fn feed(&mut self, input: usize, v: Vec<f32>);
+    fn extract(&mut self, output: usize, len: usize) -> Vec<f32>;
 }
 
 struct Connection {
@@ -41,11 +33,11 @@ impl Rack {
         for c in &self.connections {
             let out = {
                 let mut mod_out = self.modules[c.mod_out].as_mut();
-                mod_out.outputs()[c.output].extract(len)
+                mod_out.extract(c.output, len)
             };
 
             let mut mod_in = self.modules[c.mod_in].as_mut();
-            mod_in.inputs()[c.input].feed(out)
+            mod_in.feed(c.input, out)
         }
     }
 }

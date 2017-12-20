@@ -313,7 +313,8 @@ extern fn run(instance: LV2_Handle, n_samples: u32) {
         let output: &mut [f32] = std::slice::from_raw_parts_mut(amp.output, n_samples as usize);
 
         for i in 0..output.len() {
-            output[i as usize] = synth.next().unwrap();
+            // TODO Feed the modular synth.
+            // output[i as usize] = synth.next().unwrap();
         }
     }
 }

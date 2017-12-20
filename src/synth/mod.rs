@@ -145,12 +145,3 @@ impl ToneIterator {
 
 }
 
-
-impl Iterator for ToneIterator {
-    type Item = f32;
-
-    fn next(&mut self) -> Option<f32> {
-        Some(self.osc.oscillate())
-    }
-}
-
