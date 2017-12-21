@@ -51,23 +51,12 @@ impl Waveform {
     }
 }
 
-struct DataIn {
-    v: Option<Vec<f32>>,
-    default: f32
-}
-
-impl DataIn {
-    fn new(default: f32) -> DataIn {
-        DataIn { v: None, default: default }
-    }
-}
-
 pub struct Oscillator {
     w: f32,
     rate: f32,
     primary: Waveform,
-    freq_in: DataIn,
-    duty_cycle_in: DataIn,
+    freq_in: module::DataIn,
+    duty_cycle_in: module::DataIn,
 }
 
 impl Oscillator {
@@ -82,8 +71,8 @@ impl Oscillator {
             w: 0.0,
             rate,
             primary: Waveform::Sine,
-            freq_in: DataIn::new(0.0),
-            duty_cycle_in: DataIn::new(0.5),
+            freq_in: module::DataIn::new(0.0),
+            duty_cycle_in: module::DataIn::new(0.5),
         };
         ret
     }
@@ -101,17 +90,16 @@ impl module::Module for Oscillator {
     fn feed(&mut self, offset: usize, v: Vec<f32>) {
         assert!(offset == 0);
         match offset {
-            0 => self.freq_in.v = Some(v),
-            1 => self.duty_cycle_in.v = Some(v),
+            0 => self.freq_in.set(v),
+            1 => self.duty_cycle_in.set(v),
             _ => panic!("Invalid input")
         }
     }
 
     fn extract(&mut self, offset: usize, len: usize) -> Vec<f32> {
         let mut ret = Vec::<f32>::with_capacity(len);
-        let freq_in = self.freq_in.v.take();
-        let v = freq_in.unwrap_or(vec![self.freq_in.default]);
-        let mut it = v.iter();
+        let v = self.freq_in.get();
+        let mut it = v.iter().cycle();
 
         for i in 0..len {
             // TODO duty_cycle_in.iter();

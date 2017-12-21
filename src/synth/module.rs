@@ -42,3 +42,26 @@ impl Rack {
     }
 }
 
+#[derive(Debug)]
+#[derive(Clone)]
+pub struct DataIn {
+    v: Option<Vec<f32>>,
+    default: f32
+}
+
+impl DataIn {
+    pub fn new(default: f32) -> DataIn {
+        DataIn { v: None, default: default }
+    }
+
+    pub fn get(&mut self) -> Vec<f32> {
+        let v = self.v.take();
+        v.unwrap_or(vec![self.default])
+    }
+
+    pub fn set(&mut self, v: Vec<f32>) {
+        self.v = Some(v);
+    }
+}
+
+

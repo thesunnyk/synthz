@@ -7,6 +7,7 @@ use lv2_raw::midi as raw_midi;
 mod filter;
 mod module;
 pub mod oscillator;
+pub mod envelope;
 
 pub struct SynthEvent {
     time_frames: i64,
@@ -32,50 +33,9 @@ pub enum SynthProperty {
     Frame(i64),
     Speed(f32),
     Waveform(f32),
-    Envelope(Envelope),
+    Envelope(envelope::Envelope),
     FilterFreq(f32),
     FilterOn(bool)
-}
-
-#[derive(Debug)]
-#[derive(Clone)]
-pub struct Envelope {
-    a: f32,
-    d: f32,
-    s: f32,
-    r: f32,
-}
-
-impl Envelope {
-    fn new(a: f32, d: f32, s: f32, r: f32, rate: f32) -> Envelope {
-        Envelope {
-            a: rate * a,
-            d: rate * d,
-            s: s,
-            r: rate * r,
-        }
-    }
-
-    fn envelope(&self, e_t: i64, r_t: i64) -> f32 {
-        let rt = r_t as f32;
-        let et = e_t as f32;
-
-        let ad = self.a + self.d;
-        let er = et + self.r;
-
-        if rt < self.a {
-            rt / self.a
-        } else if rt < ad {
-            (1.0 - self.s) * ((ad - rt) / self.d) + self.s
-        } else if rt < et {
-            self.s
-        } else if rt < er {
-            self.s * (er - rt) / self.r
-        } else {
-            0.0
-        }
-    }
-
 }
 
 pub struct ToneIterator {
@@ -85,7 +45,7 @@ pub struct ToneIterator {
     filter_on: bool,
     osc: oscillator::Oscillator,
     waveform: f32,
-    envelope: Envelope,
+    envelope: envelope::Envelope,
 }
 
 impl ToneIterator {
@@ -97,12 +57,13 @@ impl ToneIterator {
             filter_on: true,
             osc: oscillator::Oscillator::new(rate),
             waveform: 0.0,
-            envelope: Envelope::new(0.01, 0.013, 0.6, 0.1, rate),
+            envelope: envelope::Envelope::new(rate),
         }
     }
 
-    pub fn new_env(&self, a: f32, d: f32, s: f32, r: f32) -> Envelope {
-        Envelope::new(a, d, s, r, self.rate)
+    pub fn new_env(&self, a: f32, d: f32, s: f32, r: f32) -> envelope::Envelope {
+        // TODO Don't use value from input
+        envelope::Envelope::new(self.rate)
     }
 
     pub fn add_data(&mut self, events: Vec<SynthEvent>) {
