@@ -1,5 +1,6 @@
 
 use synth::module;
+use std::f32;
 
 #[derive(Debug)]
 #[derive(Clone)]
@@ -7,6 +8,7 @@ pub struct Envelope {
     rate: f32,
     t: f32,
     t_trig: f32,
+    n_trig_1: bool,
     a: module::DataIn,
     d: module::DataIn,
     s: module::DataIn,
@@ -20,6 +22,7 @@ impl Envelope {
         Envelope {
             rate,
             t: 0.0,
+            n_trig_1: true,
             t_trig: 0.0,
             a: module::DataIn::new(0.1),
             d: module::DataIn::new(1.0),
@@ -35,8 +38,9 @@ impl Envelope {
         let d = dr * self.rate * 10.0;
         let r = rr * self.rate * 10.0;
 
-        // TODO do log to the envelope levels.
-        // TODO No one is setting t_trig
+        if ((self.n_trig_1 && trig < 0.5) || (!self.n_trig_1 && trig > 0.5)) {
+            self.t_trig = self.t;
+        }
         let rt = self.t - self.t_trig;
         let env = if trig > 0.5 {
             let ad = a + d;
@@ -57,8 +61,9 @@ impl Envelope {
             }
         };
         self.t = self.t + 1.0;
+        self.n_trig_1 = trig > 0.5;
 
-        sig_n * env
+        sig_n * (2.0 as f32).powf(env-1.0)
     }
 
 }
