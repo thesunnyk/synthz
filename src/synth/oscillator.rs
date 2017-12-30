@@ -60,9 +60,9 @@ pub struct Oscillator {
 }
 
 impl Oscillator {
-    fn get_freq(pitch: f32, rate: f32) -> f32 {
-        // TODO Pitch should be between 0 and 1
-        let freq_hz = (2.0 as f32).powf(pitch) * 440.0;
+    fn get_freq(note: f32, rate: f32) -> f32 {
+        let pitch = (note * 127.0) - 69.0;
+        let freq_hz = (2.0 as f32).powf(pitch/12.0) * 440.0;
         freq_hz / rate
     }
 
@@ -77,8 +77,8 @@ impl Oscillator {
         ret
     }
 
-    pub fn oscillate(&mut self, freq_in: f32, duty_cycle_in: f32) -> f32 {
-        let freq = Oscillator::get_freq(freq_in, self.rate);
+    pub fn oscillate(&mut self, note: f32, duty_cycle_in: f32) -> f32 {
+        let freq = Oscillator::get_freq(note, self.rate);
         let res = self.primary.oscillate(self.w, freq, duty_cycle_in);
         // TODO Use omega not t.
         self.w = self.w + 1.0;
@@ -99,12 +99,14 @@ impl module::Module for Oscillator {
     fn extract(&mut self, offset: usize, len: usize) -> Vec<f32> {
         let mut ret = Vec::<f32>::with_capacity(len);
         let v = self.freq_in.get();
+        let d = self.duty_cycle_in.get();
         let mut it = v.iter().cycle();
+        let mut dit = d.iter().cycle();
 
         for i in 0..len {
-            // TODO duty_cycle_in.iter();
             let freq: f32 = *it.next().expect("Expected more data");
-            ret.push(self.oscillate(freq, 0.0));
+            let duty_cycle: f32 = *dit.next().expect("Expected more data");
+            ret.push(self.oscillate(freq, duty_cycle));
         }
         ret
     }
