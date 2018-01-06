@@ -57,6 +57,8 @@ pub struct Oscillator {
     primary: Waveform,
     freq_in: module::DataIn,
     duty_cycle_in: module::DataIn,
+    // TODO Add an FM in.
+    // TODO Add a waveform in
 }
 
 impl Oscillator {

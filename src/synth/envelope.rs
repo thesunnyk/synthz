@@ -38,7 +38,7 @@ impl Envelope {
         let d = dr * self.rate * 10.0;
         let r = rr * self.rate * 10.0;
 
-        if ((self.n_trig_1 && trig < 0.5) || (!self.n_trig_1 && trig > 0.5)) {
+        if (self.n_trig_1 && trig < 0.5) || (!self.n_trig_1 && trig > 0.5) {
             self.t_trig = self.t;
         }
         let rt = self.t - self.t_trig;
@@ -63,7 +63,7 @@ impl Envelope {
         self.t = self.t + 1.0;
         self.n_trig_1 = trig > 0.5;
 
-        sig_n * (2.0 as f32).powf(env-1.0)
+        sig_n * ((2.0 as f32).powf(env) - 1.0)
     }
 
 }

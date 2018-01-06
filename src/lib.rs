@@ -290,15 +290,13 @@ extern fn run(instance: LV2_Handle, n_samples: u32) {
 
         let waveform = *amp.waveform;
 
-        let envelope = synth.new_env(*amp.attack, *amp.decay, *amp.sustain, *amp.release);
-
         let filter_freq = *amp.filter_freq;
 
         let filter_on = *amp.filter_on > 0.5;
 
         let control = vec!(
                 synth::SynthProperty::Waveform(waveform),
-                synth::SynthProperty::Envelope(envelope),
+                synth::SynthProperty::Envelope(*amp.attack, *amp.decay, *amp.sustain, *amp.release),
                 synth::SynthProperty::FilterFreq(filter_freq),
                 synth::SynthProperty::FilterOn(filter_on)
             );
@@ -312,9 +310,9 @@ extern fn run(instance: LV2_Handle, n_samples: u32) {
 
         let output: &mut [f32] = std::slice::from_raw_parts_mut(amp.output, n_samples as usize);
 
+        let out = synth.feed(n_samples as usize);
         for i in 0..output.len() {
-            // TODO Feed the modular synth.
-            // output[i as usize] = synth.next().unwrap();
+            output[i as usize] = out[i as usize];
         }
     }
 }

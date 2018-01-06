@@ -1,5 +1,7 @@
 
 use std::f32;
+use std::rc::Rc;
+use synth::module::Module;
 
 use lv2::midi;
 use lv2_raw::midi as raw_midi;
@@ -33,7 +35,7 @@ pub enum SynthProperty {
     Frame(i64),
     Speed(f32),
     Waveform(f32),
-    Envelope(envelope::Envelope),
+    Envelope(f32, f32, f32, f32),
     FilterFreq(f32),
     FilterOn(bool)
 }
@@ -43,27 +45,58 @@ pub struct ToneIterator {
     rate: f32,
     filter_freq: f32,
     filter_on: bool,
-    osc: oscillator::Oscillator,
     waveform: f32,
-    envelope: envelope::Envelope,
+    buffer: Rc<module::BufferModule>,
+    rack: module::Rack,
 }
 
 impl ToneIterator {
     pub fn new(rate: f32) -> ToneIterator {
-        ToneIterator {
+        let buffer = Rc::new(
+            module::BufferModule::new(vec![
+                                      module::DataIn::new(0.0), // Envelope Attack
+                                      module::DataIn::new(0.0), // Envelope Decay
+                                      module::DataIn::new(0.0), // Envelope Sustain
+                                      module::DataIn::new(0.0), // Envelope Release
+                                      module::DataIn::new(0.0), // Filter Frequency
+                                      module::DataIn::new(0.0), // Waveform type
+                                      module::DataIn::new(0.0), // Note
+                                      module::DataIn::new(0.0), // Trigger
+                                      module::DataIn::new(0.0), // Output
+            ]));
+        let mut ti = ToneIterator {
             t: 0,
             rate: rate,
             filter_freq: 22050.0,
             filter_on: true,
-            osc: oscillator::Oscillator::new(rate),
             waveform: 0.0,
-            envelope: envelope::Envelope::new(rate),
-        }
-    }
+            buffer: buffer.clone(),
+            rack: module::Rack::new(vec![
+                                    buffer,
+                                    Rc::new(oscillator::Oscillator::new(rate)),
+                                    Rc::new(envelope::Envelope::new(rate))])
+        };
 
-    pub fn new_env(&self, a: f32, d: f32, s: f32, r: f32) -> envelope::Envelope {
-        // TODO Don't use value from input
-        envelope::Envelope::new(self.rate)
+        // Connect ADSR to Envelope
+        ti.rack.connect(0,0, 2,0);
+        ti.rack.connect(0,1, 2,1);
+        ti.rack.connect(0,2, 2,2);
+        ti.rack.connect(0,3, 2,3);
+
+        // Connect trigger to envelope
+        ti.rack.connect(0,7, 2,5);
+
+        // Connect note to oscillator
+        ti.rack.connect(0,6, 1,0);
+
+        // Connect oscillator to envelope
+        ti.rack.connect(1,0, 2,4);
+
+        // Connect envelope to output
+        ti.rack.connect(2,0, 0,8);
+
+
+        ti
     }
 
     pub fn add_data(&mut self, events: Vec<SynthEvent>) {
@@ -76,7 +109,9 @@ impl ToneIterator {
                         &SynthProperty::Waveform(wave) => { self.waveform = wave }
                         &SynthProperty::FilterFreq(freq) => { self.filter_freq = freq }
                         &SynthProperty::FilterOn(ison) => { self.filter_on = ison }
-                        &SynthProperty::Envelope(ref env) => { self.envelope = env.clone() }
+                        &SynthProperty::Envelope(a, d, s, r) => {
+                            // TODO Update envelope ADSR
+                        }
                     }
                 }
             },
@@ -84,12 +119,8 @@ impl ToneIterator {
                 let t = self.t;
                 match midi_ev {
                     &midi::MidiEvent::NoteOn { note_num, velocity } => {
-                        let waveform = self.waveform.clone();
-                        let envelope = self.envelope.clone();
-                        let filter_freq = self.filter_freq;
-                        let filter_on = self.filter_on;
                         // TODO Wire up envelope, FM and filter
-                        let pitch = (note_num as i32 - 69) as f32 / 12.0;
+                        let note = note_num as f32 / 127.0;
                         // TODO Velocity as log
                     },
                     &midi::MidiEvent::NoteOff { note_num, velocity } => {
@@ -102,6 +133,12 @@ impl ToneIterator {
             },
         } }
 
+    }
+
+    pub fn feed(&mut self, samples: usize) -> Vec<f32> {
+        self.rack.feed_all(samples);
+
+        Rc::get_mut(&mut self.buffer).unwrap().extract(8, samples)
     }
 
 }
