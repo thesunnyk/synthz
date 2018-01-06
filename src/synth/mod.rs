@@ -50,20 +50,34 @@ pub struct ToneIterator {
     rack: module::Rack,
 }
 
+enum Modules {
+    Buffer,
+    Oscillator,
+    Envelope,
+}
+
+enum DataItems {
+    EnvelopeAttack = 0,
+    EnvelopeDecay = 1,
+    EnvelopeSustain = 2,
+    EnvelopeRelease = 3,
+    FilterFrequency = 4,
+    WaveformType = 5,
+    NoteFreq = 6,
+    NoteTrigger = 7,
+    Output = 8,
+    Len = 9
+}
+
 impl ToneIterator {
     pub fn new(rate: f32) -> ToneIterator {
+        let mut buffer_items = Vec::with_capacity(DataItems::Len as usize);
+        for i in 0..(DataItems::Len as usize) {
+            buffer_items.push(module::DataIn::new(0.0))
+        }
         let buffer = Rc::new(
-            module::BufferModule::new(vec![
-                                      module::DataIn::new(0.0), // Envelope Attack
-                                      module::DataIn::new(0.0), // Envelope Decay
-                                      module::DataIn::new(0.0), // Envelope Sustain
-                                      module::DataIn::new(0.0), // Envelope Release
-                                      module::DataIn::new(0.0), // Filter Frequency
-                                      module::DataIn::new(0.0), // Waveform type
-                                      module::DataIn::new(0.0), // Note
-                                      module::DataIn::new(0.0), // Trigger
-                                      module::DataIn::new(0.0), // Output
-            ]));
+            // TODO Use an enum to track all this, and fill it in with a loop
+            module::BufferModule::new(buffer_items));
         let mut ti = ToneIterator {
             t: 0,
             rate: rate,
@@ -77,23 +91,26 @@ impl ToneIterator {
                                     Rc::new(envelope::Envelope::new(rate))])
         };
 
-        // Connect ADSR to Envelope
-        ti.rack.connect(0,0, 2,0);
-        ti.rack.connect(0,1, 2,1);
-        ti.rack.connect(0,2, 2,2);
-        ti.rack.connect(0,3, 2,3);
+        ti.rack.connect(Modules::Buffer as usize, DataItems::EnvelopeAttack as usize,
+                        Modules::Envelope as usize, 0);
+        ti.rack.connect(Modules::Buffer as usize, DataItems::EnvelopeDecay as usize,
+                        Modules::Envelope as usize,1);
+        ti.rack.connect(Modules::Buffer as usize, DataItems::EnvelopeSustain as usize,
+                        Modules::Envelope as usize,2);
+        ti.rack.connect(Modules::Buffer as usize, DataItems::EnvelopeRelease as usize,
+                        Modules::Envelope as usize,3);
 
-        // Connect trigger to envelope
-        ti.rack.connect(0,7, 2,5);
+        ti.rack.connect(Modules::Buffer as usize, DataItems::NoteTrigger as usize,
+                        Modules::Envelope as usize,5);
 
-        // Connect note to oscillator
-        ti.rack.connect(0,6, 1,0);
+        ti.rack.connect(Modules::Buffer as usize, DataItems::NoteFreq as usize,
+                        Modules::Oscillator as usize,0);
 
-        // Connect oscillator to envelope
-        ti.rack.connect(1,0, 2,4);
+        ti.rack.connect(Modules::Oscillator as usize,0,
+                        Modules::Envelope as usize,4);
 
-        // Connect envelope to output
-        ti.rack.connect(2,0, 0,8);
+        ti.rack.connect(Modules::Envelope as usize,0,
+                        Modules::Buffer as usize, DataItems::Output as usize);
 
 
         ti
@@ -138,7 +155,7 @@ impl ToneIterator {
     pub fn feed(&mut self, samples: usize) -> Vec<f32> {
         self.rack.feed_all(samples);
 
-        Rc::get_mut(&mut self.buffer).unwrap().extract(8, samples)
+        Rc::get_mut(&mut self.buffer).unwrap().extract(DataItems::Output as usize, samples)
     }
 
 }
