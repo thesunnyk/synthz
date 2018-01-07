@@ -1,6 +1,4 @@
 
-use std::rc::Rc;
-
 pub trait Module {
     fn feed(&mut self, input: usize, v: Vec<f32>);
     fn extract(&mut self, output: usize, len: usize) -> Vec<f32>;
@@ -14,18 +12,18 @@ struct Connection {
 }
 
 impl Connection {
-    fn new(mod_in: usize, input: usize, mod_out: usize, output: usize) -> Connection {
+    fn new(mod_out: usize, output: usize, mod_in: usize, input: usize) -> Connection {
         Connection { mod_in, input, mod_out, output }
     }
 }
 
 pub struct Rack {
     connections: Vec<Connection>,
-    modules: Vec<Rc<Module>>
+    modules: Vec<Box<Module>>
 }
 
 impl Rack {
-    pub fn new(modules: Vec<Rc<Module>>) -> Rack {
+    pub fn new(modules: Vec<Box<Module>>) -> Rack {
         Rack {
             modules,
             connections: Vec::new()
@@ -37,14 +35,18 @@ impl Rack {
         self.connections.push(Connection::new(m, out, m_i, i));
     }
 
+    pub fn get<'a>(&'a mut self, m: usize) -> &'a mut Module {
+        self.modules[m].as_mut()
+    }
+
     pub fn feed_all(&mut self, len: usize) {
         for c in &self.connections {
             let out = {
-                let mut mod_out = Rc::get_mut(&mut self.modules[c.mod_out]).expect("should exist");
+                let mut mod_out = self.modules[c.mod_out].as_mut();
                 mod_out.extract(c.output, len)
             };
 
-            let mut mod_in = Rc::get_mut(&mut self.modules[c.mod_in]).expect("should exist");
+            let mut mod_in = self.modules[c.mod_in].as_mut();
             mod_in.feed(c.input, out)
         }
     }
@@ -72,7 +74,7 @@ impl DataIn {
     }
 }
 
-
+#[derive(Debug)]
 pub struct BufferModule {
     data: Vec<DataIn>,
 }

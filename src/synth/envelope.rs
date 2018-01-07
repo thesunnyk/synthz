@@ -75,7 +75,8 @@ impl module::Module for Envelope {
             1 => self.d.set(v),
             2 => self.s.set(v),
             3 => self.r.set(v),
-            4 => self.trigger.set(v),
+            4 => self.signal.set(v),
+            5 => self.trigger.set(v),
             _ => panic!("Doesn't match any known value")
         }
     }

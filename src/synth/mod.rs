@@ -1,6 +1,5 @@
 
 use std::f32;
-use std::rc::Rc;
 use synth::module::Module;
 
 use lv2::midi;
@@ -41,9 +40,7 @@ pub enum SynthProperty {
 }
 
 pub struct ToneIterator {
-    t: i64,
     rate: f32,
-    buffer: Rc<module::BufferModule>,
     rack: module::Rack,
 }
 
@@ -72,16 +69,12 @@ impl ToneIterator {
         for i in 0..(DataItems::Len as usize) {
             buffer_items.push(module::DataIn::new(0.0))
         }
-        let buffer = Rc::new(
-            module::BufferModule::new(buffer_items));
         let mut ti = ToneIterator {
-            t: 0,
             rate: rate,
-            buffer: buffer.clone(),
             rack: module::Rack::new(vec![
-                                    buffer,
-                                    Rc::new(oscillator::Oscillator::new(rate)),
-                                    Rc::new(envelope::Envelope::new(rate))])
+                                    Box::new(module::BufferModule::new(buffer_items)),
+                                    Box::new(oscillator::Oscillator::new(rate)),
+                                    Box::new(envelope::Envelope::new(rate))])
         };
 
         ti.rack.connect(Modules::Buffer as usize, DataItems::EnvelopeAttack as usize,
@@ -108,8 +101,12 @@ impl ToneIterator {
         ti
     }
 
+    fn get_buffer<'a>(&'a mut self) -> &'a mut module::Module {
+        self.rack.get(0)
+    }
+
     pub fn add_data(&mut self, events: Vec<SynthEvent>) {
-        let buffer = Rc::get_mut(&mut self.buffer).expect("should be available");
+        let buffer = self.get_buffer();
         for data in events.as_slice() { match &data.body {
             &SynthEventBody::SynthProperties(ref p) => {
                 for prop in p {
@@ -129,7 +126,6 @@ impl ToneIterator {
                 }
             },
             &SynthEventBody::MidiData(ref midi_ev) => {
-                let t = self.t;
                 match midi_ev {
                     &midi::MidiEvent::NoteOn { note_num, velocity } => {
                         let note = note_num as f32 / 127.0;
@@ -152,7 +148,9 @@ impl ToneIterator {
     pub fn feed(&mut self, samples: usize) -> Vec<f32> {
         self.rack.feed_all(samples);
 
-        Rc::get_mut(&mut self.buffer).expect("Should exist").extract(DataItems::Output as usize, samples)
+        let buffer = self.get_buffer();
+
+        buffer.extract(DataItems::Output as usize, samples)
     }
 
 }
