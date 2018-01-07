@@ -40,11 +40,11 @@ impl Rack {
     pub fn feed_all(&mut self, len: usize) {
         for c in &self.connections {
             let out = {
-                let mut mod_out = Rc::get_mut(&mut self.modules[c.mod_out]).unwrap();
+                let mut mod_out = Rc::get_mut(&mut self.modules[c.mod_out]).expect("should exist");
                 mod_out.extract(c.output, len)
             };
 
-            let mut mod_in = Rc::get_mut(&mut self.modules[c.mod_in]).unwrap();
+            let mut mod_in = Rc::get_mut(&mut self.modules[c.mod_in]).expect("should exist");
             mod_in.feed(c.input, out)
         }
     }

@@ -8,8 +8,8 @@ use lv2_raw::midi as raw_midi;
 
 mod filter;
 mod module;
-pub mod oscillator;
-pub mod envelope;
+mod oscillator;
+mod envelope;
 
 pub struct SynthEvent {
     time_frames: i64,
@@ -43,9 +43,6 @@ pub enum SynthProperty {
 pub struct ToneIterator {
     t: i64,
     rate: f32,
-    filter_freq: f32,
-    filter_on: bool,
-    waveform: f32,
     buffer: Rc<module::BufferModule>,
     rack: module::Rack,
 }
@@ -76,14 +73,10 @@ impl ToneIterator {
             buffer_items.push(module::DataIn::new(0.0))
         }
         let buffer = Rc::new(
-            // TODO Use an enum to track all this, and fill it in with a loop
             module::BufferModule::new(buffer_items));
         let mut ti = ToneIterator {
             t: 0,
             rate: rate,
-            filter_freq: 22050.0,
-            filter_on: true,
-            waveform: 0.0,
             buffer: buffer.clone(),
             rack: module::Rack::new(vec![
                                     buffer,
@@ -112,22 +105,25 @@ impl ToneIterator {
         ti.rack.connect(Modules::Envelope as usize,0,
                         Modules::Buffer as usize, DataItems::Output as usize);
 
-
         ti
     }
 
     pub fn add_data(&mut self, events: Vec<SynthEvent>) {
+        let buffer = Rc::get_mut(&mut self.buffer).expect("should be available");
         for data in events.as_slice() { match &data.body {
             &SynthEventBody::SynthProperties(ref p) => {
                 for prop in p {
                     match prop {
                         &SynthProperty::Frame(f) => {}
                         &SynthProperty::Speed(spd) => {}
-                        &SynthProperty::Waveform(wave) => { self.waveform = wave }
-                        &SynthProperty::FilterFreq(freq) => { self.filter_freq = freq }
-                        &SynthProperty::FilterOn(ison) => { self.filter_on = ison }
+                        &SynthProperty::Waveform(wave) => {}
+                        &SynthProperty::FilterFreq(freq) => {}
+                        &SynthProperty::FilterOn(ison) => {}
                         &SynthProperty::Envelope(a, d, s, r) => {
-                            // TODO Update envelope ADSR
+                            buffer.feed(DataItems::EnvelopeAttack as usize, vec![a]);
+                            buffer.feed(DataItems::EnvelopeDecay as usize, vec![d]);
+                            buffer.feed(DataItems::EnvelopeSustain as usize, vec![s]);
+                            buffer.feed(DataItems::EnvelopeRelease as usize, vec![r]);
                         }
                     }
                 }
@@ -136,12 +132,13 @@ impl ToneIterator {
                 let t = self.t;
                 match midi_ev {
                     &midi::MidiEvent::NoteOn { note_num, velocity } => {
-                        // TODO Wire up envelope, FM and filter
                         let note = note_num as f32 / 127.0;
+                        buffer.feed(DataItems::NoteFreq as usize, vec![note]);
+                        buffer.feed(DataItems::NoteTrigger as usize, vec![1.0]);
                         // TODO Velocity as log
                     },
                     &midi::MidiEvent::NoteOff { note_num, velocity } => {
-                        // TODO End Note
+                        buffer.feed(DataItems::NoteTrigger as usize, vec![0.0]);
                     },
                     _ => {
                         println!("MIDI {:?} @{}", midi_ev, data.time_frames);
@@ -155,7 +152,7 @@ impl ToneIterator {
     pub fn feed(&mut self, samples: usize) -> Vec<f32> {
         self.rack.feed_all(samples);
 
-        Rc::get_mut(&mut self.buffer).unwrap().extract(DataItems::Output as usize, samples)
+        Rc::get_mut(&mut self.buffer).expect("Should exist").extract(DataItems::Output as usize, samples)
     }
 
 }
