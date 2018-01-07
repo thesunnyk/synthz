@@ -92,7 +92,9 @@ impl Module for BufferModule {
 
     fn extract(&mut self, output: usize, len: usize) -> Vec<f32> {
         // TODO cycle and create a new vector.
-        self.data[output].get()
+        let val = self.data[output].get();
+        self.data[output].set(val.clone());
+        val
     }
 }
 
