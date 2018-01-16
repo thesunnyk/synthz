@@ -52,10 +52,8 @@ impl Envelope {
                 s
             }
         } else {
-            let et = self.t_trig;
-            let er = et + r;
-            if rt < er {
-                s * (er - rt) / r
+            if rt < r {
+                s * (r - rt) / r
             } else {
                 0.0
             }
