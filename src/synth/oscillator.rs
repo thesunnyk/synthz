@@ -19,26 +19,26 @@ pub enum Waveform {
 
 impl Waveform {
 
-    fn oscillate(&self, t: f32, f: f32, d: f32) -> f32 {
+    fn oscillate(&self, t: f32, f: f32, fm: f32, d: f32) -> f32 {
+        let ftfm = f * (t + 10.0 * fm);
         match self {
             &Waveform::Sine => {
                 let omega = 2.0 * f32::consts::PI;
-                f32::sin(f * t * omega)
+                f32::sin(ftfm * omega)
             },
             &Waveform::Square => {
-                if (f * t) % 1.0 < d {
+                if ftfm % 1.0 < d {
                     0.5
                 } else {
                     -0.5
                 }
             },
             &Waveform::Sawtooth => {
-                2.0 * ((f * t) % 1.0) - 1.0
+                2.0 * (ftfm % 1.0) - 1.0
             },
             &Waveform::Triangle => {
-                let out = f * t;
-                let saw = 2.0 * ((2.0 * out) % 1.0);
-                if out % 1.0 < 0.5 {
+                let saw = 2.0 * ((2.0 * ftfm) % 1.0);
+                if ftfm % 1.0 < 0.5 {
                     saw - 1.0
                 } else {
                     1.0 - saw
@@ -52,13 +52,13 @@ impl Waveform {
 }
 
 pub struct Oscillator {
-    w: f32,
+    t: f32,
     rate: f32,
     primary: Waveform,
     freq_in: module::DataIn,
     duty_cycle_in: module::DataIn,
-    // TODO Add an FM in.
-    // TODO Add a waveform in
+    fm_in: module::DataIn,
+    // TODO Add a waveform in (for sampling)
 }
 
 impl Oscillator {
@@ -70,30 +70,30 @@ impl Oscillator {
 
     pub fn new(rate: f32) -> Oscillator {
         let ret = Oscillator {
-            w: 0.0,
+            t: 0.0,
             rate,
             primary: Waveform::Sine,
             freq_in: module::DataIn::new(0.0),
             duty_cycle_in: module::DataIn::new(0.5),
+            fm_in: module::DataIn::new(0.0),
         };
         ret
     }
 
-    pub fn oscillate(&mut self, note: f32, duty_cycle_in: f32) -> f32 {
+    pub fn oscillate(&mut self, note: f32, fm_in: f32, duty_cycle_in: f32) -> f32 {
         let freq = Oscillator::get_freq(note, self.rate);
-        let res = self.primary.oscillate(self.w, freq, duty_cycle_in);
-        // TODO Use omega not t.
-        self.w = self.w + 1.0;
+        let res = self.primary.oscillate(self.t, freq, fm_in, duty_cycle_in);
+        self.t = self.t + 1.0;
         res
     }
 }
 
 impl module::Module for Oscillator {
     fn feed(&mut self, offset: usize, v: Vec<f32>) {
-        assert!(offset == 0);
         match offset {
             0 => self.freq_in.set(v),
             1 => self.duty_cycle_in.set(v),
+            2 => self.fm_in.set(v),
             _ => panic!("Invalid input")
         }
     }
@@ -102,13 +102,16 @@ impl module::Module for Oscillator {
         let mut ret = Vec::<f32>::with_capacity(len);
         let v = self.freq_in.get();
         let d = self.duty_cycle_in.get();
+        let f = self.fm_in.get();
         let mut it = v.iter().cycle();
         let mut dit = d.iter().cycle();
+        let mut fmit = f.iter().cycle();
 
         for i in 0..len {
             let freq: f32 = *it.next().expect("Expected more data");
             let duty_cycle: f32 = *dit.next().expect("Expected more data");
-            ret.push(self.oscillate(freq, duty_cycle));
+            let fm: f32 = *fmit.next().expect("Expected more data");
+            ret.push(self.oscillate(freq, fm, duty_cycle));
         }
         ret
     }

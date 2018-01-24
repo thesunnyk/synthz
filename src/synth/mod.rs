@@ -34,6 +34,7 @@ pub enum SynthProperty {
     Frame(i64),
     Speed(f32),
     Waveform(f32),
+    Secondary(f32, f32, f32),
     Envelope(f32, f32, f32, f32),
     FilterFreq(f32),
     FilterOn(bool)
@@ -47,6 +48,7 @@ pub struct ToneIterator {
 enum Modules {
     Buffer,
     Oscillator,
+    FmOscillator,
     Envelope,
 }
 
@@ -57,10 +59,13 @@ enum DataItems {
     EnvelopeRelease = 3,
     FilterFrequency = 4,
     WaveformType = 5,
-    NoteFreq = 6,
-    NoteTrigger = 7,
-    Output = 8,
-    Len = 9
+    SecWaveformType = 6,
+    SecWaveformDepth = 7,
+    SecWaveformFreq = 8,
+    NoteFreq = 9,
+    NoteTrigger = 10,
+    Output = 11,
+    Len = 12
 }
 
 impl ToneIterator {
@@ -73,6 +78,7 @@ impl ToneIterator {
             rate: rate,
             rack: module::Rack::new(vec![
                                     Box::new(module::BufferModule::new(buffer_items)),
+                                    Box::new(oscillator::Oscillator::new(rate)),
                                     Box::new(oscillator::Oscillator::new(rate)),
                                     Box::new(envelope::Envelope::new(rate))])
         };
@@ -89,8 +95,16 @@ impl ToneIterator {
         ti.rack.connect(Modules::Buffer as usize, DataItems::NoteTrigger as usize,
                         Modules::Envelope as usize,5);
 
+        // TODO Attach primary and secondary waveforms
         ti.rack.connect(Modules::Buffer as usize, DataItems::NoteFreq as usize,
                         Modules::Oscillator as usize,0);
+
+        // TODO Attach secondary depth
+        ti.rack.connect(Modules::Buffer as usize, DataItems::SecWaveformFreq as usize,
+                        Modules::FmOscillator as usize,0);
+
+        ti.rack.connect(Modules::FmOscillator as usize, 0,
+                        Modules::Oscillator as usize, 2);
 
         ti.rack.connect(Modules::Oscillator as usize,0,
                         Modules::Envelope as usize,4);
@@ -116,6 +130,11 @@ impl ToneIterator {
                         &SynthProperty::Waveform(wave) => {}
                         &SynthProperty::FilterFreq(freq) => {}
                         &SynthProperty::FilterOn(ison) => {}
+                        &SynthProperty::Secondary(wave, depth, multiplier) => {
+                            buffer.feed(DataItems::SecWaveformType as usize, vec![wave]);
+                            buffer.feed(DataItems::SecWaveformDepth as usize, vec![depth]);
+                            buffer.feed(DataItems::SecWaveformFreq as usize, vec![multiplier]);
+                        }
                         &SynthProperty::Envelope(a, d, s, r) => {
                             buffer.feed(DataItems::EnvelopeAttack as usize, vec![a]);
                             buffer.feed(DataItems::EnvelopeDecay as usize, vec![d]);

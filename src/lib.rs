@@ -297,6 +297,7 @@ extern fn run(instance: LV2_Handle, n_samples: u32) {
         let control = vec!(
                 synth::SynthProperty::Waveform(waveform),
                 synth::SynthProperty::Envelope(*amp.attack, *amp.decay, *amp.sustain, *amp.release),
+                synth::SynthProperty::Secondary(*amp.sec_waveform, *amp.sec_depth, *amp.sec_freq_mul),
                 synth::SynthProperty::FilterFreq(filter_freq),
                 synth::SynthProperty::FilterOn(filter_on)
             );
