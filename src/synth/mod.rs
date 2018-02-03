@@ -47,6 +47,7 @@ pub struct ToneIterator {
 
 enum Modules {
     Buffer,
+    Attenuverter,
     Oscillator,
     FmOscillator,
     Envelope,
@@ -78,6 +79,7 @@ impl ToneIterator {
             rate: rate,
             rack: module::Rack::new(vec![
                                     Box::new(module::BufferModule::new(buffer_items)),
+                                    Box::new(module::Attenuverter::new()),
                                     Box::new(oscillator::Oscillator::new(rate)),
                                     Box::new(oscillator::Oscillator::new(rate)),
                                     Box::new(envelope::Envelope::new(rate))])
@@ -99,11 +101,14 @@ impl ToneIterator {
         ti.rack.connect(Modules::Buffer as usize, DataItems::NoteFreq as usize,
                         Modules::Oscillator as usize,0);
 
-        // TODO Attach secondary depth
+        ti.rack.connect(Modules::Buffer as usize, DataItems::SecWaveformDepth as usize,
+                        Modules::Attenuverter as usize,0);
         ti.rack.connect(Modules::Buffer as usize, DataItems::SecWaveformFreq as usize,
                         Modules::FmOscillator as usize,0);
+        ti.rack.connect(Modules::FmOscillator as usize,0,
+                        Modules::Attenuverter as usize,1);
 
-        ti.rack.connect(Modules::FmOscillator as usize, 0,
+        ti.rack.connect(Modules::Attenuverter as usize, 0,
                         Modules::Oscillator as usize, 2);
 
         ti.rack.connect(Modules::Oscillator as usize,0,

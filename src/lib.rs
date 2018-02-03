@@ -277,7 +277,7 @@ fn extract_object(obj: *const LV2_Atom_Object_Body,
 }
 
 extern fn run(instance: LV2_Handle, n_samples: u32) {
-    let mut pamp: *mut Amp = instance as *mut Amp;
+    let pamp: *mut Amp = instance as *mut Amp;
     unsafe {
         let amp = &mut *pamp;
         let pinput = amp.input;
@@ -321,7 +321,7 @@ extern fn run(instance: LV2_Handle, n_samples: u32) {
 extern fn cleanup(instance: LV2_Handle) {
     println!("SynthZ cleanup");
     unsafe {
-        let mut amp: Box<Amp> = Box::from_raw(instance as *mut Amp);
+        let amp: Box<Amp> = Box::from_raw(instance as *mut Amp);
         drop(amp);
     }
 }

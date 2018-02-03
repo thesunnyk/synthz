@@ -98,3 +98,46 @@ impl Module for BufferModule {
     }
 }
 
+pub struct Attenuverter {
+    attenuation: DataIn,
+    signal: DataIn,
+}
+
+impl Attenuverter {
+    pub fn new() -> Attenuverter {
+        Attenuverter { attenuation: DataIn::new(1.0), signal: DataIn::new(0.0) }
+    }
+
+    fn attenuvert(val: f32, input: f32) -> f32 {
+        // TODO use 2 ^ val instead?
+        (val * 2.0 - 0.5) * input
+    }
+
+}
+
+impl Module for Attenuverter {
+    fn feed(&mut self, input: usize, v: Vec<f32>) {
+        match input {
+            0 => self.attenuation.set(v),
+            1 => self.signal.set(v),
+            _ => panic!("Invalid input")
+        }
+    }
+
+    fn extract(&mut self, output: usize, len: usize) -> Vec<f32> {
+        assert!(output == 0);
+        let mut val = Vec::with_capacity(len);
+        let att = self.attenuation.get();
+        let s = self.signal.get();
+
+        let mut ait = att.iter().cycle();
+        let mut sit = s.iter().cycle();
+        for i in 0..len {
+            let a_val = *ait.next().expect("Expected Attenuation");
+            let s_val = *sit.next().expect("Expected Signal");
+            val.push(Attenuverter::attenuvert(a_val, s_val));
+        }
+        val
+    }
+}
+
