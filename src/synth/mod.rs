@@ -47,7 +47,8 @@ pub struct ToneIterator {
 
 enum Modules {
     Buffer,
-    Attenuverter,
+    DepthAttenuverter,
+    VelocityAttenuverter,
     Oscillator,
     FmOscillator,
     Envelope,
@@ -64,9 +65,10 @@ enum DataItems {
     SecWaveformDepth = 7,
     SecWaveformFreq = 8,
     NoteFreq = 9,
-    NoteTrigger = 10,
-    Output = 11,
-    Len = 12
+    NoteVelocity = 10,
+    NoteTrigger = 11,
+    Output = 12,
+    Len = 13
 }
 
 impl ToneIterator {
@@ -79,6 +81,7 @@ impl ToneIterator {
             rate: rate,
             rack: module::Rack::new(vec![
                                     Box::new(module::BufferModule::new(buffer_items)),
+                                    Box::new(module::Attenuverter::new()),
                                     Box::new(module::Attenuverter::new()),
                                     Box::new(oscillator::Oscillator::new(rate)),
                                     Box::new(oscillator::Oscillator::new(rate)),
@@ -102,16 +105,21 @@ impl ToneIterator {
                         Modules::Oscillator as usize,0);
 
         ti.rack.connect(Modules::Buffer as usize, DataItems::SecWaveformDepth as usize,
-                        Modules::Attenuverter as usize,0);
+                        Modules::DepthAttenuverter as usize,0);
         ti.rack.connect(Modules::Buffer as usize, DataItems::SecWaveformFreq as usize,
                         Modules::FmOscillator as usize,0);
         ti.rack.connect(Modules::FmOscillator as usize,0,
-                        Modules::Attenuverter as usize,1);
+                        Modules::DepthAttenuverter as usize,1);
 
-        ti.rack.connect(Modules::Attenuverter as usize, 0,
+        ti.rack.connect(Modules::DepthAttenuverter as usize, 0,
                         Modules::Oscillator as usize, 2);
 
-        ti.rack.connect(Modules::Oscillator as usize,0,
+        ti.rack.connect(Modules::Buffer as usize, DataItems::NoteVelocity as usize,
+                        Modules::VelocityAttenuverter as usize, 0);
+        ti.rack.connect(Modules::Oscillator as usize, 0,
+                        Modules::VelocityAttenuverter as usize, 1);
+
+        ti.rack.connect(Modules::VelocityAttenuverter as usize,0,
                         Modules::Envelope as usize,4);
 
         ti.rack.connect(Modules::Envelope as usize,0,
@@ -155,7 +163,7 @@ impl ToneIterator {
                         let note = note_num as f32 / 127.0;
                         buffer.feed(DataItems::NoteFreq as usize, vec![note]);
                         buffer.feed(DataItems::NoteTrigger as usize, vec![1.0]);
-                        // TODO Velocity as log
+                        buffer.feed(DataItems::NoteVelocity as usize, vec![(velocity as f32) / 255.0 + 0.5]);
                     },
                     &midi::MidiEvent::NoteOff { note_num, velocity } => {
                         buffer.feed(DataItems::NoteTrigger as usize, vec![0.0]);
