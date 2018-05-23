@@ -100,14 +100,19 @@ impl ToneIterator {
         ti.rack.connect(Modules::Buffer as usize, DataItems::NoteTrigger as usize,
                         Modules::Envelope as usize,5);
 
-        // TODO Attach primary and secondary waveforms
+        // TODO Attach the filter
+
+        ti.rack.connect(Modules::Buffer as usize, DataItems::WaveformType as usize,
+                        Modules::Oscillator as usize,3);
         ti.rack.connect(Modules::Buffer as usize, DataItems::NoteFreq as usize,
                         Modules::Oscillator as usize,0);
 
         ti.rack.connect(Modules::Buffer as usize, DataItems::SecWaveformDepth as usize,
                         Modules::DepthAttenuverter as usize,0);
         ti.rack.connect(Modules::Buffer as usize, DataItems::SecWaveformFreq as usize,
-                        Modules::FmOscillator as usize,0);
+                        Modules::FmOscillator as usize,2);
+        ti.rack.connect(Modules::Buffer as usize, DataItems::SecWaveformType as usize,
+                        Modules::FmOscillator as usize,3);
         ti.rack.connect(Modules::FmOscillator as usize,0,
                         Modules::DepthAttenuverter as usize,1);
 
@@ -140,7 +145,9 @@ impl ToneIterator {
                     match prop {
                         &SynthProperty::Frame(f) => {}
                         &SynthProperty::Speed(spd) => {}
-                        &SynthProperty::Waveform(wave) => {}
+                        &SynthProperty::Waveform(wave) => {
+                            buffer.feed(DataItems::WaveformType as usize, vec![wave]);
+                        }
                         &SynthProperty::FilterFreq(freq) => {}
                         &SynthProperty::FilterOn(ison) => {}
                         &SynthProperty::Secondary(wave, depth, multiplier) => {

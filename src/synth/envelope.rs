@@ -33,6 +33,7 @@ impl Envelope {
         }
     }
 
+    // TODO ADSR is buggy. Should smoothly transition.
     fn envelope(&mut self, ar: f32, dr: f32, s: f32, rr: f32, trig: f32, sig_n: f32) -> f32 {
         let a = ar * self.rate * 10.0;
         let d = dr * self.rate * 10.0;

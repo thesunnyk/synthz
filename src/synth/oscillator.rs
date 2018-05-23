@@ -7,6 +7,7 @@ use std::slice::Iter;
 
 use synth::module;
 
+// TODO We could try smoothly mixing between the waves.
 #[derive(Debug)]
 #[derive(Clone)]
 pub enum Waveform {
@@ -18,6 +19,17 @@ pub enum Waveform {
 }
 
 impl Waveform {
+
+    fn from_data(data: f32) -> Waveform {
+        match (data * 5.0) as i32 {
+            x if x == Waveform::Sine as i32 => Waveform::Sine,
+            x if x == Waveform::Square as i32 => Waveform::Square,
+            x if x == Waveform::Sawtooth as i32 => Waveform::Sawtooth,
+            x if x == Waveform::Triangle as i32 => Waveform::Triangle,
+            x if x == Waveform::Noise as i32 => Waveform::Noise,
+            _ => Waveform::Sine
+        }
+    }
 
     fn oscillate(&self, t: f32, f: f32, fm: f32, d: f32) -> f32 {
         let ftfm = f * (t + 10.0 * fm);
@@ -54,11 +66,10 @@ impl Waveform {
 pub struct Oscillator {
     t: f32,
     rate: f32,
-    primary: Waveform,
+    primary: module::DataIn,
     freq_in: module::DataIn,
     duty_cycle_in: module::DataIn,
     fm_in: module::DataIn,
-    // TODO Add a waveform in (for sampling)
 }
 
 impl Oscillator {
@@ -72,7 +83,7 @@ impl Oscillator {
         let ret = Oscillator {
             t: 0.0,
             rate,
-            primary: Waveform::Sine,
+            primary: module::DataIn::new(0.0),
             freq_in: module::DataIn::new(0.0),
             duty_cycle_in: module::DataIn::new(0.5),
             fm_in: module::DataIn::new(0.0),
@@ -80,9 +91,10 @@ impl Oscillator {
         ret
     }
 
-    pub fn oscillate(&mut self, note: f32, fm_in: f32, duty_cycle_in: f32) -> f32 {
+    pub fn oscillate(&mut self, primary: f32, note: f32, fm_in: f32, duty_cycle_in: f32) -> f32 {
         let freq = Oscillator::get_freq(note, self.rate);
-        let res = self.primary.oscillate(self.t, freq, fm_in, duty_cycle_in);
+        let wave = Waveform::from_data(primary);
+        let res = wave.oscillate(self.t, freq, fm_in, duty_cycle_in);
         self.t = self.t + 1.0;
         res
     }
@@ -94,6 +106,7 @@ impl module::Module for Oscillator {
             0 => self.freq_in.set(v),
             1 => self.duty_cycle_in.set(v),
             2 => self.fm_in.set(v),
+            3 => self.primary.set(v),
             _ => panic!("Invalid input")
         }
     }
@@ -104,15 +117,18 @@ impl module::Module for Oscillator {
         let v = self.freq_in.get();
         let d = self.duty_cycle_in.get();
         let f = self.fm_in.get();
+        let p = self.primary.get();
         let mut it = v.iter().cycle();
         let mut dit = d.iter().cycle();
         let mut fmit = f.iter().cycle();
+        let mut pit = p.iter().cycle();
 
         for i in 0..len {
             let freq: f32 = *it.next().expect("Expected more data");
             let duty_cycle: f32 = *dit.next().expect("Expected more data");
             let fm: f32 = *fmit.next().expect("Expected more data");
-            ret.push(self.oscillate(freq, fm, duty_cycle));
+            let primary: f32 = *pit.next().expect("Expected more data");
+            ret.push(self.oscillate(primary, freq, fm, duty_cycle));
         }
         ret
     }
