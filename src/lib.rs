@@ -19,18 +19,18 @@ use lv2::urid::*;
 use lv2::core::*;
 use lv2::midi::*;
 
-const ControlInput: u32 = 0;
-const SynthOutput: u32 = 1;
-const Waveform: u32 = 2;
-const Attack: u32 = 3;
-const Decay: u32 = 4;
-const Sustain: u32 = 5;
-const Release: u32 = 6;
-const SecWaveform: u32 = 7;
-const SecFreqMul: u32 = 8;
-const SecDepth: u32 = 9;
-const FilterFreq: u32 = 10;
-const FilterOn: u32 = 11;
+const CONTROL_INPUT: u32 = 0;
+const SYNTH_OUTPUT: u32 = 1;
+const WAVEFORM: u32 = 2;
+const ATTACK: u32 = 3;
+const DECAY: u32 = 4;
+const SUSTAIN: u32 = 5;
+const RELEASE: u32 = 6;
+const SEC_WAVEFORM: u32 = 7;
+const SEC_FREQ_MUL: u32 = 8;
+const SEC_DEPTH: u32 = 9;
+const FILTER_FREQ: u32 = 10;
+const FILTER_ON: u32 = 11;
 
 #[derive(Debug)]
 pub struct SamplerUris {
@@ -97,31 +97,31 @@ struct Amp {
     filter_freq: *mut f32,
     filter_on: *mut f32,
     synth: synth::ToneIterator,
-    samplerUris: SamplerUris,
+    sampler_uris: SamplerUris,
 }
 
 const AMP_URI: *const u8 = b"http://quaddmg.com/plugins/synthz\0" as *const u8;
 
-const Lv2Descriptor: LV2_Descriptor = LV2_Descriptor {
+const LV2DESCRIPTOR: LV2_Descriptor = LV2_Descriptor {
     URI: AMP_URI as *const raw::c_char,
-    instantiate: instantiate,
-    connect_port: connect_port,
-    activate: activate,
-    run: run,
-    deactivate: deactivate,
-    cleanup: cleanup,
-    extension_data: extension_data
+    instantiate,
+    connect_port,
+    activate,
+    run,
+    deactivate,
+    cleanup,
+    extension_data
 };
 
-struct URID_Extractor<'a> {
+struct UridExtractor<'a> {
     urid_uri: &'a ffi::CStr,
     urid_map: Option<*const LV2_URID_Map>
 }
 
-impl <'a> URID_Extractor<'a> {
-    fn new() -> URID_Extractor<'a> {
+impl <'a> UridExtractor<'a> {
+    fn new() -> UridExtractor<'a> {
         unsafe {
-            URID_Extractor {
+            UridExtractor {
                 urid_uri: ffi::CStr::from_ptr(LV2_URID_map as *const raw::c_char),
                 urid_map: None
             }
@@ -129,7 +129,7 @@ impl <'a> URID_Extractor<'a> {
     }
 }
 
-impl <'a> FeatureExtractor for URID_Extractor<'a> {
+impl <'a> FeatureExtractor for UridExtractor<'a> {
     fn matches(&self, item: &ffi::CStr) -> bool {
         *item == *self.urid_uri
     }
@@ -147,7 +147,7 @@ extern fn instantiate(descriptor: *const LV2_Descriptor,
                       features: *const *const LV2_Feature) -> LV2_Handle {
     println!("SynthZ instantiate");
 
-    let mut urid_extractor = URID_Extractor::new();
+    let mut urid_extractor = UridExtractor::new();
     extract_features(features, vec!(&mut urid_extractor));
 
     let mut urid_map = urid_extractor.urid_map.unwrap();
@@ -166,10 +166,10 @@ extern fn instantiate(descriptor: *const LV2_Descriptor,
         filter_freq: std::ptr::null_mut(),
         filter_on: std::ptr::null_mut(),
         synth: synth::ToneIterator::new(rate as f32),
-        samplerUris: map_sampler_uris(urid_map),
+        sampler_uris: map_sampler_uris(urid_map),
     });
 
-    println!("{:?}", amp.samplerUris);
+    println!("{:?}", amp.sampler_uris);
     Box::into_raw(amp) as LV2_Handle
 }
 
@@ -179,40 +179,40 @@ extern fn connect_port(instance: LV2_Handle, port: u32, data: *mut raw::c_void) 
     unsafe {
         let amp = &mut *pamp;
         match port {
-            ControlInput => {
+            CONTROL_INPUT => {
                 amp.input = data as *const LV2_Atom
             },
-            SynthOutput => {
+            SYNTH_OUTPUT => {
                 amp.output = data as *mut f32
             },
-            Waveform => {
+            WAVEFORM => {
                 amp.waveform = data as *mut f32
             },
-            Attack => {
+            ATTACK => {
                 amp.attack = data as *mut f32
             },
-            Decay => {
+            DECAY => {
                 amp.decay = data as *mut f32
             },
-            Sustain => {
+            SUSTAIN => {
                 amp.sustain = data as *mut f32
             },
-            Release => {
+            RELEASE => {
                 amp.release = data as *mut f32
             },
-            SecWaveform => {
+            SEC_WAVEFORM => {
                 amp.sec_waveform = data as *mut f32
             },
-            SecFreqMul => {
+            SEC_FREQ_MUL => {
                 amp.sec_freq_mul = data as *mut f32
             },
-            SecDepth => {
+            SEC_DEPTH => {
                 amp.sec_depth = data as *mut f32
             }
-            FilterFreq => {
+            FILTER_FREQ => {
                 amp.filter_freq = data as *mut f32
             }
-            FilterOn => {
+            FILTER_ON => {
                 amp.filter_on = data as *mut f32
             }
             _ => {println!("SynthZ Connect to unknown port")}
@@ -249,7 +249,7 @@ fn extract_object(obj: *const LV2_Atom_Object_Body,
                   size: usize,
                   uris: &SamplerUris) -> Vec<synth::SynthProperty> {
     unsafe {
-        let oType = (*obj).otype;
+        let o_type = (*obj).otype;
         let mut processed: usize = mem::size_of::<LV2_Atom_Object_Body>();
         let mut items: Vec<synth::SynthProperty> = Vec::new();
 
@@ -284,7 +284,7 @@ extern fn run(instance: LV2_Handle, n_samples: u32) {
 
         let input = &*pinput;
 
-        let uris = &amp.samplerUris;
+        let uris = &amp.sampler_uris;
 
         let synth = &mut amp.synth;
 
@@ -335,7 +335,7 @@ extern fn extension_data(uri: *const raw::c_char) -> *mut raw::c_void {
 pub extern fn lv2_descriptor(index: u32) -> *const LV2_Descriptor {
     println!("SynthZ lv2_descriptor");
     match index {
-        0 => return &Lv2Descriptor,
+        0 => return &LV2DESCRIPTOR,
         _ => return std::ptr::null_mut()
     }
 }

@@ -61,7 +61,7 @@ pub struct DataIn {
 
 impl DataIn {
     pub fn new(default: f32) -> DataIn {
-        DataIn { v: None, default: default }
+        DataIn { v: None, default }
     }
 
     pub fn get(&mut self) -> Vec<f32> {
@@ -125,7 +125,7 @@ impl Module for Attenuverter {
     }
 
     fn extract(&mut self, output: usize, len: usize) -> Vec<f32> {
-        assert!(output == 0);
+        assert_eq!(output, 0);
         let mut val = Vec::with_capacity(len);
         let att = self.attenuation.get();
         let s = self.signal.get();

@@ -18,8 +18,8 @@ pub struct SynthEvent {
 impl SynthEvent {
     pub fn new(time_frames: i64, body: SynthEventBody) -> SynthEvent {
         SynthEvent {
-            time_frames: time_frames,
-            body: body,
+            time_frames,
+            body,
         }
     }
 }
@@ -78,7 +78,7 @@ impl ToneIterator {
             buffer_items.push(module::DataIn::new(0.0))
         }
         let mut ti = ToneIterator {
-            rate: rate,
+            rate,
             rack: module::Rack::new(vec![
                                     Box::new(module::BufferModule::new(buffer_items)),
                                     Box::new(module::Attenuverter::new()),

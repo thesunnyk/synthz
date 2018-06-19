@@ -81,7 +81,7 @@ impl module::Module for Envelope {
     }
 
     fn extract(&mut self, output: usize, len: usize) -> Vec<f32> {
-        assert!(output == 0);
+        assert_eq!(output, 0);
         let a = self.a.get();
         let d = self.d.get();
         let s = self.s.get();

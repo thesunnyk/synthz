@@ -14,11 +14,11 @@ pub struct BiQuadCoeffs {
 impl BiQuadCoeffs {
     pub fn new(b0: f32, b1: f32, b2: f32, a1: f32, a2: f32) -> BiQuadCoeffs {
         BiQuadCoeffs {
-            b0: b0,
-            b1: b1,
-            b2: b2,
-            a1: a1,
-            a2: a2
+            b0,
+            b1,
+            b2,
+            a1,
+            a2
         }
     }
 }
@@ -32,7 +32,7 @@ pub struct BiQuad {
 impl BiQuad {
     pub fn new(coeffs: BiQuadCoeffs) -> BiQuad {
         BiQuad {
-            coeffs: coeffs,
+            coeffs,
             wn1: 0.0,
             wn2: 0.0
         }
@@ -61,12 +61,12 @@ struct AnalogBiQuadCoeffs {
 impl AnalogBiQuadCoeffs {
     pub fn new(b0: f32, b1: f32, b2: f32, a0: f32, a1: f32, a2: f32) -> AnalogBiQuadCoeffs {
         AnalogBiQuadCoeffs {
-            b0: b0,
-            b1: b1,
-            b2: b2,
-            a0: a0,
-            a1: a1,
-            a2: a2
+            b0,
+            b1,
+            b2,
+            a0,
+            a1,
+            a2
         }
     }
 }
@@ -82,7 +82,7 @@ pub struct Filter {
 }
 
 impl Filter {
-    pub fn fromCfg(quads: Vec<BiQuadCoeffs>) -> Filter {
+    pub fn from_cfg(quads: Vec<BiQuadCoeffs>) -> Filter {
         let mut xv = Vec::with_capacity(quads.len());
         for i in quads {
             xv.push(BiQuad::new(i));

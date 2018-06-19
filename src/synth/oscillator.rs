@@ -112,7 +112,7 @@ impl module::Module for Oscillator {
     }
 
     fn extract(&mut self, offset: usize, len: usize) -> Vec<f32> {
-        assert!(offset == 0);
+        assert_eq!(offset, 0);
         let mut ret = Vec::<f32>::with_capacity(len);
         let v = self.freq_in.get();
         let d = self.duty_cycle_in.get();
