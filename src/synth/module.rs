@@ -1,5 +1,6 @@
 
 pub trait Module {
+    fn initialise(&mut self, pos: usize);
     fn feed(&mut self, input: usize, v: Vec<f32>);
     fn extract(&mut self, output: usize, len: usize) -> Vec<f32>;
 }
@@ -17,20 +18,34 @@ impl Connection {
     }
 }
 
+pub struct Connector {
+    mod_in: usize,
+    offset: usize
+}
+
 pub struct Rack {
     connections: Vec<Connection>,
     modules: Vec<Box<Module>>
 }
 
+// TODO Higher level connection concept
+
+// TODO Module with standard connectors.
+
 impl Rack {
     pub fn new(modules: Vec<Box<Module>>) -> Rack {
+        moules.iter().enumerate().for_each(|i, val| val.initialise(i));
         Rack {
             modules,
             connections: Vec::new()
         }
     }
 
-    pub fn connect(&mut self, m: usize, out: usize, m_i: usize, i: usize) {
+    pub fn connect(&mut self, output: Connector, input: Connector) {
+        self.connect_direct(output.mod_in, output.offset, input.mod_in, input.offset)
+    }
+
+    pub fn connect_direct(&mut self, m: usize, out: usize, m_i: usize, i: usize) {
         // TODO Insert connection at the appropriate spot.
         self.connections.push(Connection::new(m, out, m_i, i));
     }
@@ -77,15 +92,29 @@ impl DataIn {
 #[derive(Debug)]
 pub struct BufferModule {
     data: Vec<DataIn>,
+    pos: usize,
 }
 
 impl BufferModule {
     pub fn new(data: Vec<DataIn>) -> BufferModule {
-        BufferModule { data }
+        BufferModule { data, pos: 0 }
+    }
+
+    pub fn connector(&self, item: usize) -> Connector {
+        assert!(item < self.data.len());
+
+        Connector {
+            mod_in: self.pos,
+            offset: item
+        }
     }
 }
 
 impl Module for BufferModule {
+    fn initialise(&mut self, pos: usize) {
+        self.pos = pos;
+    }
+
     fn feed(&mut self, input: usize, v: Vec<f32>) {
         self.data[input].set(v)
     }
@@ -101,11 +130,18 @@ impl Module for BufferModule {
 pub struct Attenuverter {
     attenuation: DataIn,
     signal: DataIn,
+    pos: usize
 }
+
+pub enum AttenuverterInput { ATTENUATION, SIGNAL }
 
 impl Attenuverter {
     pub fn new() -> Attenuverter {
-        Attenuverter { attenuation: DataIn::new(1.0), signal: DataIn::new(0.0) }
+        Attenuverter {
+            attenuation: DataIn::new(1.0),
+            signal: DataIn::new(0.0),
+            pos: 0
+        }
     }
 
     fn attenuvert(val: f32, input: f32) -> f32 {
@@ -113,9 +149,26 @@ impl Attenuverter {
         (val * 2.0 - 0.5) * input
     }
 
+    fn connector_in(&self, item: AttenuverterInput) -> Connector {
+        Connector {
+            mod_in: self.pos,
+            offset: item as usize
+        }
+    }
+
+    fn connector_out(&self) -> Connector {
+        Connector {
+            mod_in: self.pos,
+            offset: 0
+        }
+    }
 }
 
 impl Module for Attenuverter {
+    fn initialise(&mut self, pos: usize) {
+        self.pos = pos;
+    }
+
     fn feed(&mut self, input: usize, v: Vec<f32>) {
         match input {
             0 => self.attenuation.set(v),

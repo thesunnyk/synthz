@@ -14,7 +14,17 @@ pub struct Envelope {
     s: module::DataIn,
     r: module::DataIn,
     signal: module::DataIn,
-    trigger: module::DataIn
+    trigger: module::DataIn,
+    pos: usize
+}
+
+pub enum EnvelopeInputs {
+    Attack,
+    Decay,
+    Sustain,
+    Release,
+    Signal,
+    Trigger
 }
 
 impl Envelope {
@@ -29,7 +39,22 @@ impl Envelope {
             s: module::DataIn::new(1.0),
             r: module::DataIn::new(0.1),
             signal: module::DataIn::new(0.0),
-            trigger: module::DataIn::new(0.0)
+            trigger: module::DataIn::new(0.0),
+            pos: 0
+        }
+    }
+
+    pub fn connector_out(&self) -> module::Connector {
+        module::Connector {
+            mod_in: self.pos,
+            offset: 0
+        }
+    }
+
+    pub fn connector_in(&self, i: EnvelopeInputs) -> module::Connector {
+        module::Connector {
+            mod_in: self.pos,
+            offset: i as usize
         }
     }
 
@@ -68,14 +93,18 @@ impl Envelope {
 }
 
 impl module::Module for Envelope {
+    fn initialise(&mut self, pos: usize) {
+        self.pos = pos;
+    }
+
     fn feed(&mut self, input: usize, v: Vec<f32>) {
-        match input {
-            0 => self.a.set(v),
-            1 => self.d.set(v),
-            2 => self.s.set(v),
-            3 => self.r.set(v),
-            4 => self.signal.set(v),
-            5 => self.trigger.set(v),
+        match input as EnvelopeInputs {
+            Attack => self.a.set(v),
+            Decay => self.d.set(v),
+            Sustain => self.s.set(v),
+            Release => self.r.set(v),
+            Signal => self.signal.set(v),
+            Trigger => self.trigger.set(v),
             _ => panic!("Doesn't match any known value")
         }
     }

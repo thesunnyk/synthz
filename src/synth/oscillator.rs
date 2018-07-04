@@ -70,6 +70,14 @@ pub struct Oscillator {
     freq_in: module::DataIn,
     duty_cycle_in: module::DataIn,
     fm_in: module::DataIn,
+    pos: usize
+}
+
+pub enum OscillatorInput {
+    FreqIn,
+    DutyCycleIn,
+    FmIn,
+    Primary,
 }
 
 impl Oscillator {
@@ -87,6 +95,7 @@ impl Oscillator {
             freq_in: module::DataIn::new(0.0),
             duty_cycle_in: module::DataIn::new(0.5),
             fm_in: module::DataIn::new(0.0),
+            pos: 0,
         };
         ret
     }
@@ -98,15 +107,33 @@ impl Oscillator {
         self.t = self.t + 1.0;
         res
     }
+
+    pub fn connector_in(&self, input: OscillatorInput) -> module::Connector {
+        module::Connector {
+            mod_in: self.pos,
+            offset: input as usize
+        }
+    }
+
+    pub fn connector_out(&self) -> module::Connector {
+        module::Connector {
+            mod_in: self.pos,
+            offset: 0
+        }
+    }
 }
 
 impl module::Module for Oscillator {
+    fn initialise(&mut self, pos: usize) {
+        self.pos = pos;
+    }
+
     fn feed(&mut self, offset: usize, v: Vec<f32>) {
-        match offset {
-            0 => self.freq_in.set(v),
-            1 => self.duty_cycle_in.set(v),
-            2 => self.fm_in.set(v),
-            3 => self.primary.set(v),
+        match offset as OscillatorInput {
+            FreqIn => self.freq_in.set(v),
+            DutyCycleIn => self.duty_cycle_in.set(v),
+            FmIn => self.fm_in.set(v),
+            Primary => self.primary.set(v),
             _ => panic!("Invalid input")
         }
     }
