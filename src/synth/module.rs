@@ -12,9 +12,27 @@ pub struct ConnectorInfo {
     mod_conn: String
 }
 
+impl ConnectorInfo {
+    pub fn new(name: &'static str, conn: &'static str) -> ConnectorInfo {
+        ConnectorInfo {
+            mod_name: String::from(name),
+            mod_conn: String::from(conn)
+        }
+    }
+}
+
 pub struct ConnectionInfo {
     conn_in: ConnectorInfo,
     conn_out: ConnectorInfo
+}
+
+impl ConnectionInfo {
+    pub fn new(conn_out: ConnectorInfo, conn_in: ConnectorInfo) -> ConnectionInfo {
+        ConnectionInfo {
+            conn_in,
+            conn_out
+        }
+    }
 }
 
 pub struct ModuleInfo {

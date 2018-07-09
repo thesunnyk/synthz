@@ -96,7 +96,45 @@ impl ToneIterator {
             module::ModuleInfo::new("secondary_osc", Box::new(oscillator::Oscillator::new(rate))),
             module::ModuleInfo::new("envelope", Box::new(envelope::Envelope::new(rate))),
         ];
-        let mut connections = vec![];
+        let buffer_env_attack = module::ConnectorInfo::new("buffer", "envelope_attack");
+        let buffer_env_decay = module::ConnectorInfo::new("buffer", "envelope_decay");
+        let buffer_env_sustain = module::ConnectorInfo::new("buffer", "envelope_sustain");
+        let buffer_env_release = module::ConnectorInfo::new("buffer", "envelope_release");
+        let buffer_filter_freq = module::ConnectorInfo::new("buffer", "filter_frequency");
+        let buffer_waveform_type = module::ConnectorInfo::new("buffer", "waveform_type");
+        let buffer_sec_waveform_type = module::ConnectorInfo::new("buffer", "sec_waveform_type");
+        let buffer_sec_waveform_depth = module::ConnectorInfo::new("buffer", "sec_waveform_depth");
+        let buffer_note_freq = module::ConnectorInfo::new("buffer", "note_freq");
+        let buffer_note_velocity = module::ConnectorInfo::new("buffer", "note_velocity");
+        let buffer_note_trigger = module::ConnectorInfo::new("buffer", "note_trigger");
+        let buffer_output = module::ConnectorInfo::new("buffer", "output");
+
+        let depth_attenuverter_attenuation = module::ConnectorInfo::new("depth_attenuverter", "attenuation");
+        let depth_attenuverter_signal = module::ConnectorInfo::new("depth_attenuverter", "signal");
+
+        let velocity_attenuverter_attenuation = module::ConnectorInfo::new("velocity_attenuverter", "attenuation");
+        let velocity_attenuverter_signal = module::ConnectorInfo::new("velocity_attenuverter", "signal");
+
+        let primary_osc_freq_in = module::ConnectorInfo::new("primary_osc", "freq_in");
+        let primary_osc_duty_cycle_in = module::ConnectorInfo::new("primary_osc", "duty_cycle_in");
+        let primary_osc_fm_in = module::ConnectorInfo::new("primary_osc", "fm_in");
+        let primary_osc_primary = module::ConnectorInfo::new("primary_osc", "primary");
+
+        let secondary_osc_freq_in = module::ConnectorInfo::new("secondary_osc", "freq_in");
+        let secondary_osc_duty_cycle_in = module::ConnectorInfo::new("secondary_osc", "duty_cycle_in");
+        let secondary_osc_fm_in = module::ConnectorInfo::new("secondary_osc", "fm_in");
+        let secondary_osc_secondary = module::ConnectorInfo::new("secondary_osc", "primary");
+
+        let envelope_attack = module::ConnectorInfo::new("envelope", "attack");
+        let envelope_decay = module::ConnectorInfo::new("envelope", "decay");
+        let envelope_sustain = module::ConnectorInfo::new("envelope", "sustain");
+        let envelope_release = module::ConnectorInfo::new("envelope", "release");
+        let envelope_signal = module::ConnectorInfo::new("envelope", "signal");
+        let envelope_trigger = module::ConnectorInfo::new("envelope", "trigger");
+
+        let mut connections = vec![
+            module::ConnectionInfo::new(buffer_env_attack, envelope_attack),
+        ];
         let mut ti = ToneIterator {
             rate,
             rack: module::Rack::new(modules, connections)
