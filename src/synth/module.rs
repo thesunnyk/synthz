@@ -1,8 +1,31 @@
 
+use std::collections::HashMap;
+
 pub trait Module {
-    fn initialise(&mut self, pos: usize);
+    fn connector(&self, name: String) -> usize;
     fn feed(&mut self, input: usize, v: Vec<f32>);
     fn extract(&mut self, output: usize, len: usize) -> Vec<f32>;
+}
+
+pub struct ConnectorInfo {
+    mod_name: String,
+    mod_conn: String
+}
+
+pub struct ConnectionInfo {
+    conn_in: ConnectorInfo,
+    conn_out: ConnectorInfo
+}
+
+pub struct ModuleInfo {
+    name: String,
+    module: Box<Module>
+}
+
+impl ModuleInfo {
+    pub fn new(name: &'static str, module: Box<Module>) -> ModuleInfo {
+        ModuleInfo { name: String::from(name), module }
+    }
 }
 
 struct Connection {
@@ -33,11 +56,27 @@ pub struct Rack {
 // TODO Module with standard connectors.
 
 impl Rack {
-    pub fn new(modules: Vec<Box<Module>>) -> Rack {
-        moules.iter().enumerate().for_each(|i, val| val.initialise(i));
+    pub fn new(mut module_info: Vec<ModuleInfo>, connection_info: Vec<ConnectionInfo>) -> Rack {
+        let mut mod_names = HashMap::new();
+
+        module_info.iter().enumerate().for_each(|(i, v)| { mod_names.insert(v.name.clone(), i); });
+        let drain_range = 0..module_info.len();
+        let modules: Vec<Box<Module>> = module_info.drain(drain_range).map(|val| val.module).collect();
+
+        let connections: Vec<Connection> = connection_info.iter().map(|c| {
+            let mod_in_offset = mod_names.get(&c.conn_in.mod_name).unwrap();
+            let mod_out_offset = mod_names.get(&c.conn_out.mod_name).unwrap();
+            Connection::new(
+                *mod_in_offset,
+                modules.get(*mod_in_offset).unwrap().connector(c.conn_in.mod_conn.clone()),
+                *mod_out_offset,
+                modules.get(*mod_out_offset).unwrap().connector(c.conn_out.mod_conn.clone())
+            )
+        }).collect();
+
         Rack {
             modules,
-            connections: Vec::new()
+            connections
         }
     }
 
@@ -71,12 +110,13 @@ impl Rack {
 #[derive(Clone)]
 pub struct DataIn {
     v: Option<Vec<f32>>,
-    default: f32
+    default: f32,
+    name: String
 }
 
 impl DataIn {
-    pub fn new(default: f32) -> DataIn {
-        DataIn { v: None, default }
+    pub fn new(name: String, default: f32) -> DataIn {
+        DataIn { name, v: None, default }
     }
 
     pub fn get(&mut self) -> Vec<f32> {
@@ -91,28 +131,18 @@ impl DataIn {
 
 #[derive(Debug)]
 pub struct BufferModule {
-    data: Vec<DataIn>,
-    pos: usize,
+    data: Vec<DataIn>
 }
 
 impl BufferModule {
     pub fn new(data: Vec<DataIn>) -> BufferModule {
-        BufferModule { data, pos: 0 }
-    }
-
-    pub fn connector(&self, item: usize) -> Connector {
-        assert!(item < self.data.len());
-
-        Connector {
-            mod_in: self.pos,
-            offset: item
-        }
+        BufferModule { data }
     }
 }
 
 impl Module for BufferModule {
-    fn initialise(&mut self, pos: usize) {
-        self.pos = pos;
+    fn connector(&self, item: String) -> usize {
+        self.data.iter().position(|v| v.name == item).unwrap()
     }
 
     fn feed(&mut self, input: usize, v: Vec<f32>) {
@@ -129,18 +159,14 @@ impl Module for BufferModule {
 
 pub struct Attenuverter {
     attenuation: DataIn,
-    signal: DataIn,
-    pos: usize
+    signal: DataIn
 }
-
-pub enum AttenuverterInput { ATTENUATION, SIGNAL }
 
 impl Attenuverter {
     pub fn new() -> Attenuverter {
         Attenuverter {
-            attenuation: DataIn::new(1.0),
-            signal: DataIn::new(0.0),
-            pos: 0
+            attenuation: DataIn::new(String::from("attenuation"), 1.0),
+            signal: DataIn::new(String::from("signal"), 0.0),
         }
     }
 
@@ -148,25 +174,15 @@ impl Attenuverter {
         // TODO use 2 ^ val instead?
         (val * 2.0 - 0.5) * input
     }
-
-    fn connector_in(&self, item: AttenuverterInput) -> Connector {
-        Connector {
-            mod_in: self.pos,
-            offset: item as usize
-        }
-    }
-
-    fn connector_out(&self) -> Connector {
-        Connector {
-            mod_in: self.pos,
-            offset: 0
-        }
-    }
 }
 
 impl Module for Attenuverter {
-    fn initialise(&mut self, pos: usize) {
-        self.pos = pos;
+    fn connector(&self, item: String) -> usize {
+        match item.as_str() {
+            "attenuation" => 0,
+            "signal" => 1,
+            _ => panic!("Invalid input")
+        }
     }
 
     fn feed(&mut self, input: usize, v: Vec<f32>) {

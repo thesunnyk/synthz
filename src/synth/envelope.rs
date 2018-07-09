@@ -14,17 +14,7 @@ pub struct Envelope {
     s: module::DataIn,
     r: module::DataIn,
     signal: module::DataIn,
-    trigger: module::DataIn,
-    pos: usize
-}
-
-pub enum EnvelopeInputs {
-    Attack,
-    Decay,
-    Sustain,
-    Release,
-    Signal,
-    Trigger
+    trigger: module::DataIn
 }
 
 impl Envelope {
@@ -34,27 +24,12 @@ impl Envelope {
             t: 0.0,
             n_trig_1: true,
             t_trig: 0.0,
-            a: module::DataIn::new(0.1),
-            d: module::DataIn::new(1.0),
-            s: module::DataIn::new(1.0),
-            r: module::DataIn::new(0.1),
-            signal: module::DataIn::new(0.0),
-            trigger: module::DataIn::new(0.0),
-            pos: 0
-        }
-    }
-
-    pub fn connector_out(&self) -> module::Connector {
-        module::Connector {
-            mod_in: self.pos,
-            offset: 0
-        }
-    }
-
-    pub fn connector_in(&self, i: EnvelopeInputs) -> module::Connector {
-        module::Connector {
-            mod_in: self.pos,
-            offset: i as usize
+            a: module::DataIn::new(String::from("attack"), 0.1),
+            d: module::DataIn::new(String::from("decay"), 1.0),
+            s: module::DataIn::new(String::from("sustain"), 1.0),
+            r: module::DataIn::new(String::from("release"), 0.1),
+            signal: module::DataIn::new(String::from("signal"), 0.0),
+            trigger: module::DataIn::new(String::from("trigger"), 0.0)
         }
     }
 
@@ -93,18 +68,26 @@ impl Envelope {
 }
 
 impl module::Module for Envelope {
-    fn initialise(&mut self, pos: usize) {
-        self.pos = pos;
+    fn connector(&self, item: String) -> usize {
+        match item.as_str() {
+            "attack" => 0,
+            "decay" => 1,
+            "sustain" => 2,
+            "release" => 3,
+            "signal" => 4,
+            "trigger" => 5,
+            _ => panic!("Invalid input")
+        }
     }
 
     fn feed(&mut self, input: usize, v: Vec<f32>) {
-        match input as EnvelopeInputs {
-            Attack => self.a.set(v),
-            Decay => self.d.set(v),
-            Sustain => self.s.set(v),
-            Release => self.r.set(v),
-            Signal => self.signal.set(v),
-            Trigger => self.trigger.set(v),
+        match input {
+            0 => self.a.set(v),
+            1 => self.d.set(v),
+            2 => self.s.set(v),
+            3 => self.r.set(v),
+            4 => self.signal.set(v),
+            5 => self.trigger.set(v),
             _ => panic!("Doesn't match any known value")
         }
     }

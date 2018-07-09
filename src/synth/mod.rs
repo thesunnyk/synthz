@@ -4,8 +4,6 @@ use synth::module::Module;
 
 use lv2::midi;
 use lv2_raw::midi as raw_midi;
-use synth::module::AttenuverterInput;
-use synth::oscillator::OscillatorInput;
 
 mod filter;
 mod module;
@@ -75,69 +73,76 @@ enum DataItems {
 
 impl ToneIterator {
     pub fn new(rate: f32) -> ToneIterator {
-        let mut buffer_items = Vec::with_capacity(DataItems::Len as usize);
-        for i in 0..(DataItems::Len as usize) {
-            buffer_items.push(module::DataIn::new(0.0))
-        }
+        let mut buffer_items = vec![
+            module::DataIn::new(String::from("envelope_attack"), 0.0),
+            module::DataIn::new(String::from("envelope_decay"), 0.0),
+            module::DataIn::new(String::from("envelope_sustain"), 0.0),
+            module::DataIn::new(String::from("envelope_release"), 0.0),
+            module::DataIn::new(String::from("filter_frequency"), 0.0),
+            module::DataIn::new(String::from("waveform_type"), 0.0),
+            module::DataIn::new(String::from("sec_waveform_type"), 0.0),
+            module::DataIn::new(String::from("sec_waveform_depth"), 0.0),
+            module::DataIn::new(String::from("sec_waveform_freq"), 0.0),
+            module::DataIn::new(String::from("note_freq"), 0.0),
+            module::DataIn::new(String::from("note_velocity"), 0.0),
+            module::DataIn::new(String::from("note_trigger"), 0.0),
+            module::DataIn::new(String::from("output"), 0.0)
+        ];
+        let mut modules = vec![
+            module::ModuleInfo::new("buffer", Box::new(module::BufferModule::new(buffer_items))),
+            module::ModuleInfo::new("depth_attenuverter", Box::new(module::Attenuverter::new())),
+            module::ModuleInfo::new("velocity_attenuverter", Box::new(module::Attenuverter::new())),
+            module::ModuleInfo::new("primary_osc", Box::new(oscillator::Oscillator::new(rate))),
+            module::ModuleInfo::new("secondary_osc", Box::new(oscillator::Oscillator::new(rate))),
+            module::ModuleInfo::new("envelope", Box::new(envelope::Envelope::new(rate))),
+        ];
+        let mut connections = vec![];
         let mut ti = ToneIterator {
             rate,
-            rack: module::Rack::new(vec![
-                                    Box::new(module::BufferModule::new(buffer_items)),
-                                    Box::new(module::Attenuverter::new()),
-                                    Box::new(module::Attenuverter::new()),
-                                    Box::new(oscillator::Oscillator::new(rate)),
-                                    Box::new(oscillator::Oscillator::new(rate)),
-                                    Box::new(envelope::Envelope::new(rate))])
+            rack: module::Rack::new(modules, connections)
         };
 
-        let buffer = ti.rack.get(0);
-        let depth_attenuverter = ti.rack.get(1);
-        let velocity_attenuverter = ti.rack.get(2);
-        let oscillator = ti.rack.get(3);
-        let fm_oscillator = ti.rack.get(4);
-        let envelope = ti.rack.get(5);
-
-        ti.rack.connect( buffer.connector(DataItems::EnvelopeAttack as usize),
-                        envelope.connect_in(EnvelopeInput::Attack));
-        ti.rack.connect(buffer.connector(DataItems::EnvelopeDecay as usize),
-                        envelope.connect_in(EnvelopeInput::Decay));
-        ti.rack.connect(buffer.connector(DataItems::EnvelopeSustain as usize),
-                        envelope.connect_in(EnvelopeInput::Sustain));
-        ti.rack.connect(buffer.connector(DataItems::EnvelopeRelease as usize),
-                        envelope.connect_in(EnvelopeInput::Release));
-
-        ti.rack.connect(buffer.connector(DataItems::NoteTrigger as usize),
-                        envelope.connect_in(EnvelopeInput::Trigger));
-
-        // TODO Attach the filter
-
-        ti.rack.connect(buffer.connector(DataItems::WaveformType as usize),
-                        oscillator.connector_in(OscillatorInput::Primary));
-        ti.rack.connect(buffer.connector(DataItems::NoteFreq as usize),
-                        oscillator.connector_in(OscillatorInput::FreqIn));
-
-        ti.rack.connect(buffer.connector(DataItems::SecWaveformDepth as usize),
-                        depth_attenuverter.connector_in(AttenuverterInput::ATTENUATION));
-        ti.rack.connect(buffer.connector(DataItems::SecWaveformFreq as usize),
-                        fm_oscillator.connector_in(OscillatorInput::FreqIn));
-        ti.rack.connect(buffer.connector(DataItems::SecWaveformType as usize),
-                        fm_oscillator.connector_in(OscillatorInput::Primary));
-        ti.rack.connect(fm_oscillator.connector_out(),
-                        depth_attenuverter.connector_in(AttenuverterInput::SIGNAL));
-
-        ti.rack.connect(depth_attenuverter.connector_out(),
-                        oscillator.connector_in(OscillatorInput::FmIn));
-
-        ti.rack.connect(buffer.connector(DataItems::NoteVelocity as usize),
-                        velocity_attenuverter.conector_in(AttenuverterInput::ATTENUATION));
-        ti.rack.connect(oscillator.connector_out(),
-                        velocity_attenuverter.connector_in(AttenuverterInput::SIGNAL));
-
-        ti.rack.connect(velocity_attenuverter.connector_out(),
-                        envelope.connect_in(EnvelopeInput::Signal));
-
-        ti.rack.connect(envelope.connector_out(),
-                        buffer.connector(DataItems::Output as usize));
+//        ti.rack.connect( buffer.connector(DataItems::EnvelopeAttack as usize),
+//                        envelope.connect_in(EnvelopeInput::Attack));
+//        ti.rack.connect(buffer.connector(DataItems::EnvelopeDecay as usize),
+//                        envelope.connect_in(EnvelopeInput::Decay));
+//        ti.rack.connect(buffer.connector(DataItems::EnvelopeSustain as usize),
+//                        envelope.connect_in(EnvelopeInput::Sustain));
+//        ti.rack.connect(buffer.connector(DataItems::EnvelopeRelease as usize),
+//                        envelope.connect_in(EnvelopeInput::Release));
+//
+//        ti.rack.connect(buffer.connector(DataItems::NoteTrigger as usize),
+//                        envelope.connect_in(EnvelopeInput::Trigger));
+//
+//        // TODO Attach the filter
+//
+//        ti.rack.connect(buffer.connector(DataItems::WaveformType as usize),
+//                        oscillator.connector_in(OscillatorInput::Primary));
+//        ti.rack.connect(buffer.connector(DataItems::NoteFreq as usize),
+//                        oscillator.connector_in(OscillatorInput::FreqIn));
+//
+//        ti.rack.connect(buffer.connector(DataItems::SecWaveformDepth as usize),
+//                        depth_attenuverter.connector_in(AttenuverterInput::ATTENUATION));
+//        ti.rack.connect(buffer.connector(DataItems::SecWaveformFreq as usize),
+//                        fm_oscillator.connector_in(OscillatorInput::FreqIn));
+//        ti.rack.connect(buffer.connector(DataItems::SecWaveformType as usize),
+//                        fm_oscillator.connector_in(OscillatorInput::Primary));
+//        ti.rack.connect(fm_oscillator.connector_out(),
+//                        depth_attenuverter.connector_in(AttenuverterInput::SIGNAL));
+//
+//        ti.rack.connect(depth_attenuverter.connector_out(),
+//                        oscillator.connector_in(OscillatorInput::FmIn));
+//
+//        ti.rack.connect(buffer.connector(DataItems::NoteVelocity as usize),
+//                        velocity_attenuverter.conector_in(AttenuverterInput::ATTENUATION));
+//        ti.rack.connect(oscillator.connector_out(),
+//                        velocity_attenuverter.connector_in(AttenuverterInput::SIGNAL));
+//
+//        ti.rack.connect(velocity_attenuverter.connector_out(),
+//                        envelope.connect_in(EnvelopeInput::Signal));
+//
+//        ti.rack.connect(envelope.connector_out(),
+//                        buffer.connector(DataItems::Output as usize));
 
         ti
     }
