@@ -1,7 +1,9 @@
 
 use std::collections::HashMap;
+use std::iter::Cycle;
 
 pub trait Module {
+    // TODO Connector should be part of builder pattern / metadata
     fn connector(&self, name: String) -> usize;
     fn feed(&mut self, input: usize, v: Vec<f32>);
     fn extract(&mut self, output: usize, len: usize) -> Vec<f32>;
@@ -69,10 +71,6 @@ pub struct Rack {
     modules: Vec<Box<Module>>
 }
 
-// TODO Higher level connection concept
-
-// TODO Module with standard connectors.
-
 impl Rack {
     pub fn new(mut module_info: Vec<ModuleInfo>, connection_info: Vec<ConnectionInfo>) -> Rack {
         let mut mod_names = HashMap::new();
@@ -121,6 +119,48 @@ impl Rack {
             let mut mod_in = self.modules[c.mod_in].as_mut();
             mod_in.feed(c.input, out)
         }
+    }
+}
+
+pub trait MisoWorker {
+    fn getData(&self) -> Vec<DataIn>;
+    fn extract(&mut self, vals: Vec<f32>) -> f32;
+}
+
+pub struct MisoModule<T: MisoWorker> {
+    data: Vec<DataIn>,
+    worker: Box<T>
+}
+
+impl <T: MisoWorker> Module for MisoModule<T> {
+    fn connector(&self, name: String) -> usize {
+        match (self.data.iter().position(|v| v.name == name)) {
+            Some(i) => i,
+            None => {
+                assert!(name == String::from("output"));
+                0
+            }
+        }
+    }
+
+    fn feed(&mut self, input: usize, v: Vec<f32>) {
+        self.data[input].set(v)
+    }
+
+    fn extract(&mut self, output: usize, len: usize) -> Vec<f32> {
+        assert_eq!(output, 0);
+        let mut val = Vec::with_capacity(len);
+        let mut vecs: Vec<Vec<f32>> = self.data.iter_mut().map(|d| d.get()).collect();
+        let mut cycles = Vec::with_capacity(vecs.len());
+        for item in vecs.iter() {
+            cycles.push(item.iter().cycle());
+        }
+
+        for i in 0..len {
+            let inputs = cycles.iter_mut().map(|c| *c.next().unwrap()).collect();
+            val.push((&mut self.worker).extract(inputs));
+        }
+        val
     }
 }
 
