@@ -199,6 +199,7 @@ impl Module for Attenuverter {
         match item.as_str() {
             "attenuation" => 0,
             "signal" => 1,
+            "output" => 0,
             _ => panic!("Invalid input")
         }
     }

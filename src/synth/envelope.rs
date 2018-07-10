@@ -76,6 +76,7 @@ impl module::Module for Envelope {
             "release" => 3,
             "signal" => 4,
             "trigger" => 5,
+            "output" => 0,
             _ => panic!("Invalid input")
         }
     }

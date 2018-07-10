@@ -104,6 +104,7 @@ impl ToneIterator {
         let buffer_waveform_type = module::ConnectorInfo::new("buffer", "waveform_type");
         let buffer_sec_waveform_type = module::ConnectorInfo::new("buffer", "sec_waveform_type");
         let buffer_sec_waveform_depth = module::ConnectorInfo::new("buffer", "sec_waveform_depth");
+        let buffer_sec_waveform_freq = module::ConnectorInfo::new("buffer", "sec_waveform_freq");
         let buffer_note_freq = module::ConnectorInfo::new("buffer", "note_freq");
         let buffer_note_velocity = module::ConnectorInfo::new("buffer", "note_velocity");
         let buffer_note_trigger = module::ConnectorInfo::new("buffer", "note_trigger");
@@ -111,19 +112,23 @@ impl ToneIterator {
 
         let depth_attenuverter_attenuation = module::ConnectorInfo::new("depth_attenuverter", "attenuation");
         let depth_attenuverter_signal = module::ConnectorInfo::new("depth_attenuverter", "signal");
+        let depth_attenuverter_out = module::ConnectorInfo::new("depth_attenuverter", "output");
 
         let velocity_attenuverter_attenuation = module::ConnectorInfo::new("velocity_attenuverter", "attenuation");
         let velocity_attenuverter_signal = module::ConnectorInfo::new("velocity_attenuverter", "signal");
+        let velocity_attenuverter_out = module::ConnectorInfo::new("velocity_attenuverter", "output");
 
-        let primary_osc_freq_in = module::ConnectorInfo::new("primary_osc", "freq_in");
-        let primary_osc_duty_cycle_in = module::ConnectorInfo::new("primary_osc", "duty_cycle_in");
-        let primary_osc_fm_in = module::ConnectorInfo::new("primary_osc", "fm_in");
-        let primary_osc_primary = module::ConnectorInfo::new("primary_osc", "primary");
+        let osc_freq_in = module::ConnectorInfo::new("primary_osc", "freq_in");
+        let osc_duty_cycle_in = module::ConnectorInfo::new("primary_osc", "duty_cycle_in");
+        let osc_fm_in = module::ConnectorInfo::new("primary_osc", "fm_in");
+        let osc_primary = module::ConnectorInfo::new("primary_osc", "primary");
+        let osc_out = module::ConnectorInfo::new("primary_osc", "output");
 
-        let secondary_osc_freq_in = module::ConnectorInfo::new("secondary_osc", "freq_in");
-        let secondary_osc_duty_cycle_in = module::ConnectorInfo::new("secondary_osc", "duty_cycle_in");
-        let secondary_osc_fm_in = module::ConnectorInfo::new("secondary_osc", "fm_in");
-        let secondary_osc_secondary = module::ConnectorInfo::new("secondary_osc", "primary");
+        let fm_osc_freq_in = module::ConnectorInfo::new("secondary_osc", "freq_in");
+        let fm_osc_duty_cycle_in = module::ConnectorInfo::new("secondary_osc", "duty_cycle_in");
+        let fm_osc_fm_in = module::ConnectorInfo::new("secondary_osc", "fm_in");
+        let fm_osc_primary = module::ConnectorInfo::new("secondary_osc", "primary");
+        let fm_osc_out = module::ConnectorInfo::new("secondary_osc", "output");
 
         let envelope_attack = module::ConnectorInfo::new("envelope", "attack");
         let envelope_decay = module::ConnectorInfo::new("envelope", "decay");
@@ -131,56 +136,37 @@ impl ToneIterator {
         let envelope_release = module::ConnectorInfo::new("envelope", "release");
         let envelope_signal = module::ConnectorInfo::new("envelope", "signal");
         let envelope_trigger = module::ConnectorInfo::new("envelope", "trigger");
+        let envelope_out = module::ConnectorInfo::new("envelope", "output");
 
         let mut connections = vec![
             module::ConnectionInfo::new(buffer_env_attack, envelope_attack),
+            module::ConnectionInfo::new(buffer_env_decay, envelope_decay),
+            module::ConnectionInfo::new(buffer_env_sustain, envelope_sustain),
+            module::ConnectionInfo::new(buffer_env_release, envelope_release),
+
+            module::ConnectionInfo::new(buffer_note_trigger, envelope_trigger),
+            // TODO Attach the filter
+            module::ConnectionInfo::new(buffer_waveform_type, osc_primary),
+            module::ConnectionInfo::new(buffer_note_freq, osc_freq_in),
+
+            module::ConnectionInfo::new(buffer_sec_waveform_depth, depth_attenuverter_attenuation),
+            module::ConnectionInfo::new(buffer_sec_waveform_freq, fm_osc_freq_in),
+            module::ConnectionInfo::new(buffer_sec_waveform_type, fm_osc_primary),
+            module::ConnectionInfo::new(fm_osc_out, depth_attenuverter_signal),
+
+            module::ConnectionInfo::new(depth_attenuverter_out, osc_fm_in),
+
+            module::ConnectionInfo::new(buffer_note_velocity, velocity_attenuverter_attenuation),
+            module::ConnectionInfo::new(osc_out, velocity_attenuverter_signal),
+
+            module::ConnectionInfo::new(velocity_attenuverter_out, envelope_signal),
+
+            module::ConnectionInfo::new(envelope_out, buffer_output)
         ];
         let mut ti = ToneIterator {
             rate,
             rack: module::Rack::new(modules, connections)
         };
-
-//        ti.rack.connect( buffer.connector(DataItems::EnvelopeAttack as usize),
-//                        envelope.connect_in(EnvelopeInput::Attack));
-//        ti.rack.connect(buffer.connector(DataItems::EnvelopeDecay as usize),
-//                        envelope.connect_in(EnvelopeInput::Decay));
-//        ti.rack.connect(buffer.connector(DataItems::EnvelopeSustain as usize),
-//                        envelope.connect_in(EnvelopeInput::Sustain));
-//        ti.rack.connect(buffer.connector(DataItems::EnvelopeRelease as usize),
-//                        envelope.connect_in(EnvelopeInput::Release));
-//
-//        ti.rack.connect(buffer.connector(DataItems::NoteTrigger as usize),
-//                        envelope.connect_in(EnvelopeInput::Trigger));
-//
-//        // TODO Attach the filter
-//
-//        ti.rack.connect(buffer.connector(DataItems::WaveformType as usize),
-//                        oscillator.connector_in(OscillatorInput::Primary));
-//        ti.rack.connect(buffer.connector(DataItems::NoteFreq as usize),
-//                        oscillator.connector_in(OscillatorInput::FreqIn));
-//
-//        ti.rack.connect(buffer.connector(DataItems::SecWaveformDepth as usize),
-//                        depth_attenuverter.connector_in(AttenuverterInput::ATTENUATION));
-//        ti.rack.connect(buffer.connector(DataItems::SecWaveformFreq as usize),
-//                        fm_oscillator.connector_in(OscillatorInput::FreqIn));
-//        ti.rack.connect(buffer.connector(DataItems::SecWaveformType as usize),
-//                        fm_oscillator.connector_in(OscillatorInput::Primary));
-//        ti.rack.connect(fm_oscillator.connector_out(),
-//                        depth_attenuverter.connector_in(AttenuverterInput::SIGNAL));
-//
-//        ti.rack.connect(depth_attenuverter.connector_out(),
-//                        oscillator.connector_in(OscillatorInput::FmIn));
-//
-//        ti.rack.connect(buffer.connector(DataItems::NoteVelocity as usize),
-//                        velocity_attenuverter.conector_in(AttenuverterInput::ATTENUATION));
-//        ti.rack.connect(oscillator.connector_out(),
-//                        velocity_attenuverter.connector_in(AttenuverterInput::SIGNAL));
-//
-//        ti.rack.connect(velocity_attenuverter.connector_out(),
-//                        envelope.connect_in(EnvelopeInput::Signal));
-//
-//        ti.rack.connect(envelope.connector_out(),
-//                        buffer.connector(DataItems::Output as usize));
 
         ti
     }

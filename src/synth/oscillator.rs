@@ -107,6 +107,7 @@ impl module::Module for Oscillator {
             "duty_cycle_in" => 1,
             "fm_in" => 2,
             "primary" => 3,
+            "output" => 0,
             _ => panic!("Invalid input")
         }
     }
