@@ -120,11 +120,11 @@ pub trait MisoWorker {
 
 pub struct MisoModule<T: MisoWorker> {
     data: Vec<DataIn>,
-    worker: Box<T>
+    worker: T
 }
 
 impl <T: MisoWorker> MisoModule<T> {
-    pub fn new(worker: Box<T>) -> MisoModule<T> {
+    pub fn new(worker: T) -> MisoModule<T> {
         MisoModule {
             data: worker.get_data(),
             worker
@@ -158,7 +158,7 @@ impl <T: MisoWorker> Module for MisoModule<T> {
 
         for i in 0..len {
             let inputs = cycles.iter_mut().map(|c| *c.next().unwrap()).collect();
-            val.push((&mut self.worker).extract(inputs));
+            val.push(self.worker.extract(inputs));
         }
         val
     }
@@ -220,7 +220,7 @@ pub struct Attenuverter {
 
 impl Attenuverter {
     pub fn new() -> MisoModule<Attenuverter> {
-        MisoModule::new(Box::new(Attenuverter { }))
+        MisoModule::new(Attenuverter { })
     }
 
     fn attenuvert(val: f32, input: f32) -> f32 {

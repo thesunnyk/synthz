@@ -76,10 +76,10 @@ impl Oscillator {
     }
 
     pub fn new(rate: f32) -> module::MisoModule<Oscillator> {
-        module::MisoModule::new(Box::new(Oscillator {
+        module::MisoModule::new(Oscillator {
             t: 0.0,
             rate,
-        }))
+        })
     }
 
     pub fn oscillate(&mut self, primary: f32, note: f32, fm_in: f32, duty_cycle_in: f32) -> f32 {

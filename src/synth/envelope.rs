@@ -13,12 +13,12 @@ pub struct Envelope {
 
 impl Envelope {
     pub fn new(rate: f32) -> module::MisoModule<Envelope> {
-        module::MisoModule::new(Box::new(Envelope {
+        module::MisoModule::new(Envelope {
             rate,
             t: 0.0,
             n_trig_1: true,
             t_trig: 0.0,
-        }))
+        })
     }
 
     // TODO ADSR is buggy. Should smoothly transition.
