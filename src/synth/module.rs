@@ -83,10 +83,10 @@ impl Rack {
             let mod_in_offset = mod_names.get(&c.conn_in.mod_name).unwrap();
             let mod_out_offset = mod_names.get(&c.conn_out.mod_name).unwrap();
             Connection::new(
-                *mod_in_offset,
-                modules.get(*mod_in_offset).unwrap().connector(c.conn_in.mod_conn.clone()),
                 *mod_out_offset,
-                modules.get(*mod_out_offset).unwrap().connector(c.conn_out.mod_conn.clone())
+                modules.get(*mod_out_offset).unwrap().connector(c.conn_out.mod_conn.clone()),
+                *mod_in_offset,
+                modules.get(*mod_in_offset).unwrap().connector(c.conn_in.mod_conn.clone())
             )
         }).collect();
 
@@ -94,15 +94,6 @@ impl Rack {
             modules,
             connections
         }
-    }
-
-    pub fn connect(&mut self, output: Connector, input: Connector) {
-        self.connect_direct(output.mod_in, output.offset, input.mod_in, input.offset)
-    }
-
-    pub fn connect_direct(&mut self, m: usize, out: usize, m_i: usize, i: usize) {
-        // TODO Insert connection at the appropriate spot.
-        self.connections.push(Connection::new(m, out, m_i, i));
     }
 
     pub fn get<'a>(&'a mut self, m: usize) -> &'a mut Module {
