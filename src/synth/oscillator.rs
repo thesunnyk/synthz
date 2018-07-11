@@ -66,10 +66,6 @@ impl Waveform {
 pub struct Oscillator {
     t: f32,
     rate: f32,
-    primary: module::DataIn,
-    freq_in: module::DataIn,
-    duty_cycle_in: module::DataIn,
-    fm_in: module::DataIn
 }
 
 impl Oscillator {
@@ -79,16 +75,11 @@ impl Oscillator {
         freq_hz / rate
     }
 
-    pub fn new(rate: f32) -> Oscillator {
-        let ret = Oscillator {
+    pub fn new(rate: f32) -> module::MisoModule<Oscillator> {
+        module::MisoModule::new(Box::new(Oscillator {
             t: 0.0,
             rate,
-            primary: module::DataIn::new(String::from("primary"), 0.0),
-            freq_in: module::DataIn::new(String::from("freq_in"), 0.0),
-            duty_cycle_in: module::DataIn::new(String::from("duty_cycle_in"), 0.5),
-            fm_in: module::DataIn::new(String::from("fm_in"), 0.0),
-        };
-        ret
+        }))
     }
 
     pub fn oscillate(&mut self, primary: f32, note: f32, fm_in: f32, duty_cycle_in: f32) -> f32 {
@@ -100,48 +91,18 @@ impl Oscillator {
     }
 }
 
-impl module::Module for Oscillator {
-    fn connector(&self, item: String) -> usize {
-        match item.as_str() {
-            "freq_in" => 0,
-            "duty_cycle_in" => 1,
-            "fm_in" => 2,
-            "primary" => 3,
-            "output" => 0,
-            _ => panic!("Invalid input")
-        }
+impl module::MisoWorker for Oscillator {
+    fn get_data(&self) -> Vec<module::DataIn> {
+        vec![
+            module::DataIn::new(String::from("primary"), 0.0),
+            module::DataIn::new(String::from("freq_in"), 0.0),
+            module::DataIn::new(String::from("fm_in"), 0.0),
+            module::DataIn::new(String::from("duty_cycle_in"), 0.5),
+        ]
     }
 
-    fn feed(&mut self, offset: usize, v: Vec<f32>) {
-        match offset {
-            0 => self.freq_in.set(v),
-            1 => self.duty_cycle_in.set(v),
-            2 => self.fm_in.set(v),
-            3 => self.primary.set(v),
-            _ => panic!("Invalid input")
-        }
-    }
-
-    fn extract(&mut self, offset: usize, len: usize) -> Vec<f32> {
-        assert_eq!(offset, 0);
-        let mut ret = Vec::<f32>::with_capacity(len);
-        let v = self.freq_in.get();
-        let d = self.duty_cycle_in.get();
-        let f = self.fm_in.get();
-        let p = self.primary.get();
-        let mut it = v.iter().cycle();
-        let mut dit = d.iter().cycle();
-        let mut fmit = f.iter().cycle();
-        let mut pit = p.iter().cycle();
-
-        for i in 0..len {
-            let freq: f32 = *it.next().expect("Expected more data");
-            let duty_cycle: f32 = *dit.next().expect("Expected more data");
-            let fm: f32 = *fmit.next().expect("Expected more data");
-            let primary: f32 = *pit.next().expect("Expected more data");
-            ret.push(self.oscillate(primary, freq, fm, duty_cycle));
-        }
-        ret
+    fn extract(&mut self, vals: Vec<f32>) -> f32 {
+        self.oscillate(vals[0], vals[1], vals[2], vals[3])
     }
 }
 

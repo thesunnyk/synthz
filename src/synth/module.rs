@@ -123,13 +123,22 @@ impl Rack {
 }
 
 pub trait MisoWorker {
-    fn getData(&self) -> Vec<DataIn>;
+    fn get_data(&self) -> Vec<DataIn>;
     fn extract(&mut self, vals: Vec<f32>) -> f32;
 }
 
 pub struct MisoModule<T: MisoWorker> {
     data: Vec<DataIn>,
     worker: Box<T>
+}
+
+impl <T: MisoWorker> MisoModule<T> {
+    pub fn new(worker: Box<T>) -> MisoModule<T> {
+        MisoModule {
+            data: worker.get_data(),
+            worker
+        }
+    }
 }
 
 impl <T: MisoWorker> Module for MisoModule<T> {
@@ -216,16 +225,11 @@ impl Module for BufferModule {
 }
 
 pub struct Attenuverter {
-    attenuation: DataIn,
-    signal: DataIn
 }
 
 impl Attenuverter {
-    pub fn new() -> Attenuverter {
-        Attenuverter {
-            attenuation: DataIn::new(String::from("attenuation"), 1.0),
-            signal: DataIn::new(String::from("signal"), 0.0),
-        }
+    pub fn new() -> MisoModule<Attenuverter> {
+        MisoModule::new(Box::new(Attenuverter { }))
     }
 
     fn attenuvert(val: f32, input: f32) -> f32 {
@@ -234,38 +238,16 @@ impl Attenuverter {
     }
 }
 
-impl Module for Attenuverter {
-    fn connector(&self, item: String) -> usize {
-        match item.as_str() {
-            "attenuation" => 0,
-            "signal" => 1,
-            "output" => 0,
-            _ => panic!("Invalid input")
-        }
+impl MisoWorker for Attenuverter {
+    fn get_data(&self) -> Vec<DataIn> {
+        vec![
+            DataIn::new(String::from("attenuation"), 1.0),
+            DataIn::new(String::from("signal"), 0.0),
+        ]
     }
 
-    fn feed(&mut self, input: usize, v: Vec<f32>) {
-        match input {
-            0 => self.attenuation.set(v),
-            1 => self.signal.set(v),
-            _ => panic!("Invalid input")
-        }
-    }
-
-    fn extract(&mut self, output: usize, len: usize) -> Vec<f32> {
-        assert_eq!(output, 0);
-        let mut val = Vec::with_capacity(len);
-        let att = self.attenuation.get();
-        let s = self.signal.get();
-
-        let mut ait = att.iter().cycle();
-        let mut sit = s.iter().cycle();
-        for i in 0..len {
-            let a_val = *ait.next().expect("Expected Attenuation");
-            let s_val = *sit.next().expect("Expected Signal");
-            val.push(Attenuverter::attenuvert(a_val, s_val));
-        }
-        val
+    fn extract(&mut self, vals: Vec<f32>) -> f32 {
+        Attenuverter::attenuvert(vals[0], vals[1])
     }
 }
 

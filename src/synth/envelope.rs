@@ -9,28 +9,16 @@ pub struct Envelope {
     t: f32,
     t_trig: f32,
     n_trig_1: bool,
-    a: module::DataIn,
-    d: module::DataIn,
-    s: module::DataIn,
-    r: module::DataIn,
-    signal: module::DataIn,
-    trigger: module::DataIn
 }
 
 impl Envelope {
-    pub fn new(rate: f32) -> Envelope {
-        Envelope {
+    pub fn new(rate: f32) -> module::MisoModule<Envelope> {
+        module::MisoModule::new(Box::new(Envelope {
             rate,
             t: 0.0,
             n_trig_1: true,
             t_trig: 0.0,
-            a: module::DataIn::new(String::from("attack"), 0.1),
-            d: module::DataIn::new(String::from("decay"), 1.0),
-            s: module::DataIn::new(String::from("sustain"), 1.0),
-            r: module::DataIn::new(String::from("release"), 0.1),
-            signal: module::DataIn::new(String::from("signal"), 0.0),
-            trigger: module::DataIn::new(String::from("trigger"), 0.0)
-        }
+        }))
     }
 
     // TODO ADSR is buggy. Should smoothly transition.
@@ -67,60 +55,19 @@ impl Envelope {
 
 }
 
-impl module::Module for Envelope {
-    fn connector(&self, item: String) -> usize {
-        match item.as_str() {
-            "attack" => 0,
-            "decay" => 1,
-            "sustain" => 2,
-            "release" => 3,
-            "signal" => 4,
-            "trigger" => 5,
-            "output" => 0,
-            _ => panic!("Invalid input")
-        }
+impl module::MisoWorker for Envelope {
+    fn get_data(&self) -> Vec<module::DataIn> {
+        vec![
+            module::DataIn::new(String::from("attack"), 0.1),
+            module::DataIn::new(String::from("decay"), 1.0),
+            module::DataIn::new(String::from("sustain"), 1.0),
+            module::DataIn::new(String::from("release"), 0.1),
+            module::DataIn::new(String::from("trigger"), 0.0),
+            module::DataIn::new(String::from("signal"), 0.0),
+        ]
     }
 
-    fn feed(&mut self, input: usize, v: Vec<f32>) {
-        match input {
-            0 => self.a.set(v),
-            1 => self.d.set(v),
-            2 => self.s.set(v),
-            3 => self.r.set(v),
-            4 => self.signal.set(v),
-            5 => self.trigger.set(v),
-            _ => panic!("Doesn't match any known value")
-        }
-    }
-
-    fn extract(&mut self, output: usize, len: usize) -> Vec<f32> {
-        assert_eq!(output, 0);
-        let a = self.a.get();
-        let d = self.d.get();
-        let s = self.s.get();
-        let r = self.r.get();
-        let trigger = self.trigger.get();
-        let signal = self.signal.get();
-
-        let mut a_it = a.iter().cycle();
-        let mut d_it = d.iter().cycle();
-        let mut s_it = s.iter().cycle();
-        let mut r_it = r.iter().cycle();
-        let mut t_it = trigger.iter().cycle();
-        let mut sig_it = signal.iter().cycle();
-
-        let mut ret = Vec::<f32>::with_capacity(len);
-        for i in 0..len {
-            let an: f32 = *a_it.next().expect("Expected more data");
-            let dn: f32 = *d_it.next().expect("Expected more data");
-            let sn: f32 = *s_it.next().expect("Expected more data");
-            let rn: f32 = *r_it.next().expect("Expected more data");
-            let sig_n: f32 = *sig_it.next().expect("Expected more data");
-            let t_n: f32 = *t_it.next().expect("Expected more data");
-
-            ret.push(self.envelope(an, dn, sn, rn, t_n, sig_n));
-        }
-
-        ret
+    fn extract(&mut self, vals: Vec<f32>) -> f32 {
+        self.envelope(vals[0], vals[1], vals[2], vals[3], vals[4], vals[5])
     }
 }
