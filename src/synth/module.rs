@@ -149,6 +149,7 @@ impl <T: MisoWorker> Module for MisoModule<T> {
 
     fn extract(&mut self, output: usize, len: usize) -> Vec<f32> {
         assert_eq!(output, 0);
+        assert!(self.data.len() <= 10);
         let mut val = Vec::with_capacity(len);
         let mut vecs: Vec<Vec<f32>> = self.data.iter_mut().map(|d| d.get()).collect();
         let mut cycles = Vec::with_capacity(vecs.len());
@@ -156,8 +157,11 @@ impl <T: MisoWorker> Module for MisoModule<T> {
             cycles.push(item.iter().cycle());
         }
 
+        let mut inputs: [f32; 10] = [0.0; 10];
         for i in 0..len {
-            let inputs: Vec<f32> = cycles.iter_mut().map(|c| *c.next().unwrap()).collect();
+            for i in 0..cycles.len() {
+                inputs[i] = *cycles[i].next().unwrap();
+            }
             val.push(self.worker.extract(&inputs));
         }
         val
