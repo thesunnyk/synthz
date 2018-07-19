@@ -115,7 +115,7 @@ impl Rack {
 
 pub trait MisoWorker {
     fn get_data(&self) -> Vec<DataIn>;
-    fn extract(&mut self, vals: Vec<f32>) -> f32;
+    fn extract(&mut self, vals: &[f32]) -> f32;
 }
 
 pub struct MisoModule<T: MisoWorker> {
@@ -157,8 +157,8 @@ impl <T: MisoWorker> Module for MisoModule<T> {
         }
 
         for i in 0..len {
-            let inputs = cycles.iter_mut().map(|c| *c.next().unwrap()).collect();
-            val.push(self.worker.extract(inputs));
+            let inputs: Vec<f32> = cycles.iter_mut().map(|c| *c.next().unwrap()).collect();
+            val.push(self.worker.extract(&inputs));
         }
         val
     }
@@ -237,7 +237,7 @@ impl MisoWorker for Attenuverter {
         ]
     }
 
-    fn extract(&mut self, vals: Vec<f32>) -> f32 {
+    fn extract(&mut self, vals: &[f32]) -> f32 {
         Attenuverter::attenuvert(vals[0], vals[1])
     }
 }

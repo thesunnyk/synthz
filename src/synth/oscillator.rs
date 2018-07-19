@@ -101,7 +101,7 @@ impl module::MisoWorker for Oscillator {
         ]
     }
 
-    fn extract(&mut self, vals: Vec<f32>) -> f32 {
+    fn extract(&mut self, vals: &[f32]) -> f32 {
         self.oscillate(vals[0], vals[1], vals[2], vals[3])
     }
 }
