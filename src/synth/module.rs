@@ -159,8 +159,8 @@ impl <T: MisoWorker> Module for MisoModule<T> {
 
         let mut inputs: [f32; 10] = [0.0; 10];
         for i in 0..len {
-            for i in 0..cycles.len() {
-                inputs[i] = *cycles[i].next().unwrap();
+            for j in 0..cycles.len() {
+                inputs[j] = *cycles[j].next().unwrap();
             }
             val.push(self.worker.extract(&inputs));
         }
