@@ -9,6 +9,8 @@ pub struct Envelope {
     t: f32,
     t_trig: f32,
     n_trig_1: bool,
+    cur: f32,
+    t_vol: f32,
 }
 
 impl Envelope {
@@ -18,10 +20,11 @@ impl Envelope {
             t: 0.0,
             n_trig_1: true,
             t_trig: 0.0,
+            cur: 0.0,
+            t_vol: 0.0,
         })
     }
 
-    // TODO ADSR is buggy. Should smoothly transition.
     fn envelope(&mut self, ar: f32, dr: f32, s: f32, rr: f32, trig: f32, sig_n: f32) -> f32 {
         let a = ar * self.rate * 10.0;
         let d = dr * self.rate * 10.0;
@@ -29,12 +32,13 @@ impl Envelope {
 
         if (self.n_trig_1 && trig < 0.5) || (!self.n_trig_1 && trig > 0.5) {
             self.t_trig = self.t;
+            self.t_vol = self.cur;
         }
         let rt = self.t - self.t_trig;
         let env = if trig > 0.5 {
             let ad = a + d;
             if rt < a {
-                rt / a
+                self.cur + (1.0 - self.t_vol) / a
             } else if rt < ad {
                 (1.0 - s) * ((ad - rt) / d) + s
             } else {
@@ -42,13 +46,14 @@ impl Envelope {
             }
         } else {
             if rt < r {
-                s * (r - rt) / r
+                self.cur - self.t_vol / r
             } else {
                 0.0
             }
         };
         self.t = self.t + 1.0;
         self.n_trig_1 = trig > 0.5;
+        self.cur = env;
 
         sig_n * ((2.0 as f32).powf(env) - 1.0)
     }

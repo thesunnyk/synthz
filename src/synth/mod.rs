@@ -206,6 +206,9 @@ impl ToneIterator {
                 match midi_ev {
                     &midi::MidiEvent::NoteOn { note_num, velocity } => {
                         let note = note_num as f32 / 127.0;
+                        // TODO Create vectors with offset of old values, then the new values until
+                        // the next note.
+                        let offset = data.time_frames;
                         buffer.feed(DataItems::NoteFreq as usize, vec![note]);
                         buffer.feed(DataItems::NoteTrigger as usize, vec![1.0]);
                         buffer.feed(DataItems::NoteVelocity as usize, vec![(velocity as f32) / 255.0 + 0.5]);
